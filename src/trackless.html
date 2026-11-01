@@ -1,0 +1,99 @@
+<meta name="theme-color" content="#e4e8f1">
+<title>Kiyoame — Web Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  :root { --bg:#e4e8f1; --ink:#2a2f52; --muted:#6a7196; --line:rgba(42,47,82,.12); --glass:rgba(255,255,255,.78);
+          --upper:#6fd3cd; --lower:#f293ba; --accent:#ffc46b; --rest:#9b8cff; --miss:#d9536a; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:Montserrat,system-ui,sans-serif; overflow:hidden; overscroll-behavior:none; -webkit-user-select:none; user-select:none; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; touch-action:none; display:block; }
+  .panel { position:fixed; inset:0; display:flex; overflow:auto; background:rgba(236,239,246,.66); -webkit-backdrop-filter:blur(14px) saturate(1.1); backdrop-filter:blur(14px) saturate(1.1); padding:max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
+  .panel[hidden] { display:none; }
+  .card { width:min(380px,100%); display:grid; gap:12px; margin:auto; }
+  h1 { margin:0; font-size:24px; font-weight:400; letter-spacing:.08em; } h2 { margin:0; font-size:14px; color:var(--muted); font-weight:400; letter-spacing:.06em; }
+  p { margin:0; font-size:13px; line-height:1.8; color:var(--muted); }
+  h3 { margin:10px 0 0; font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.3em; }
+
+  button { font:inherit; font-weight:500; font-size:15px; letter-spacing:.2em; padding:14px; border-radius:12px; border:1px solid transparent; background:var(--ink); color:#f6f7fb; box-shadow:0 6px 20px rgba(42,47,82,.18); cursor:pointer; }
+  button:active { transform:translateY(1px); }
+  .ghost { background:transparent; color:var(--ink); border-color:var(--line); box-shadow:none; }
+  .small { padding:8px 12px; font-size:13px; letter-spacing:.06em; }
+  .bar { display:flex; align-items:center; gap:12px; } .bar h1 { font-size:20px; letter-spacing:.3em; }
+
+  label { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); }
+  input[type=range], input[type=checkbox] { accent-color:#5a63a6; }
+  select { font:inherit; font-size:13px; padding:7px 10px; border-radius:10px; border:1px solid var(--line); background:var(--glass); color:var(--ink); margin-left:auto; }
+  .speed { display:grid; gap:6px; } .speed-head { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); } .speed-head output { color:var(--ink); font-weight:600; }
+  .speed-row { display:grid; grid-template-columns:44px 1fr 44px; gap:10px; align-items:center; } .speed-row input { width:100%; }
+  .speed-row button { padding:8px 0; font-size:18px; letter-spacing:0; background:var(--glass); color:var(--ink); border-color:var(--line); box-shadow:none; }
+  .legend { display:grid; gap:8px; font-size:13px; color:var(--muted); line-height:1.6; }
+  .legend b { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:8px; vertical-align:-1px; }
+
+  #home { background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .home { text-align:center; gap:14px; } .home .mark { font-size:11px; letter-spacing:.6em; color:var(--muted); margin:0 0 -6px; } #start-status { min-height:1.6em; text-align:center; } .home .title { font-size:36px; font-weight:300; letter-spacing:.2em; white-space:nowrap; color:var(--ink); } .home .hint { font-size:12px; letter-spacing:.04em; } .home h2 { font-weight:400; letter-spacing:.2em; }
+  .home button { padding:16px; letter-spacing:.3em; background:rgba(255,255,255,.78); color:var(--ink); border:1px solid var(--line); box-shadow:0 6px 24px rgba(90,98,160,.12); } .home button.ghost { background:transparent; color:#4a5080; box-shadow:none; }
+
+  #chart-pick { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:4px 0 2px; }
+  .home #chart-pick button { padding:10px; font-size:13px; letter-spacing:.18em; background:transparent; color:var(--muted); box-shadow:none; }
+  .home #chart-pick button[aria-pressed="true"] { background:rgba(255,255,255,.78); color:var(--ink); border-color:rgba(42,47,82,.35); }
+
+  #r-score { font-size:44px; font-weight:300; letter-spacing:.18em; text-align:center; }
+  #r-acc { text-align:center; }
+  table { border-collapse:collapse; font-size:13px; width:100%; background:var(--glass); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  td { padding:7px 14px; border-top:1px solid var(--line); color:var(--ink); } tr:first-child td { border-top:0; } td:last-child { text-align:right; color:var(--muted); }
+</style>
+<canvas id="c"></canvas>
+<div class="panel" id="home">
+  <div class="card home">
+    <p class="mark">KIYOAME</p>
+    <h1 class="title" id="song-title"></h1>
+    <h2 id="song-meta"></h2>
+    <div id="chart-pick" role="group" aria-label="Chart"><button type="button" data-chart="standard">Standard</button><button type="button" data-chart="showcase">Showcase</button></div>
+    <button class="go" type="button">Start</button>
+    <button id="to-settings" type="button" class="ghost">Settings</button>
+    <p id="start-status" role="status" aria-live="polite"></p>
+    <p class="hint">Mouse or touch: press, hold and slide where the notes meet the line.</p>
+  </div>
+</div>
+<div class="panel" id="settings" hidden>
+  <div class="card">
+    <div class="bar"><button id="settings-back" type="button" class="ghost small">‹</button><h1>Settings</h1></div>
+    <h3>SCROLL SPEED</h3>
+    <div class="speed">
+      <div class="speed-head"><span>Upper layer</span><output id="speed-upper-out"></output></div>
+      <div class="speed-row"><button type="button" id="speed-upper-down" aria-label="Upper layer speed −0.1">−</button><input type="range" id="speed-upper" min="1" max="12" step="0.1"><button type="button" id="speed-upper-up" aria-label="Upper layer speed +0.1">+</button></div>
+      <div class="speed-head"><span>Lower layer</span><output id="speed-lower-out"></output></div>
+      <div class="speed-row"><button type="button" id="speed-lower-down" aria-label="Lower layer speed −0.1">−</button><input type="range" id="speed-lower" min="1" max="12" step="0.1"><button type="button" id="speed-lower-up" aria-label="Lower layer speed +0.1">+</button></div>
+      <label><input type="checkbox" id="proj-sync"> Same speed for both layers</label>
+    </div>
+    <h3>DISPLAY</h3>
+    <label>Background<select id="backdrop"><option value="on">Mist</option><option value="off">Dark</option></select></label>
+    <label>Touch area<select id="touch-zone"><option value="near">Near the line</option><option value="half">Lower half</option><option value="full">Full screen</option></select></label>
+    <label>Grid lines<select id="grid-mode"><option value="lane">Lane width</option><option value="all">All cells</option><option value="off">Off</option></select></label>
+    <label><input type="checkbox" id="auto"> Auto play</label>
+  </div>
+</div>
+<div class="panel" id="result" hidden>
+  <div class="card">
+    <h1 id="r-score"></h1>
+    <h2 id="r-acc"></h2>
+    <table id="r-table"></table>
+    <button id="again" type="button">Retry</button>
+    <button id="result-home" type="button" class="ghost">Back</button>
+  </div>
+</div>
+<div class="panel" id="rotate" hidden><div class="card"><h1>Rotate to landscape</h1></div></div>
+<script src="trackless-core.js"></script>
+<script src="projection.js"></script>
+<script src="backdrop.js"></script>
+<script src="song/audio.js" data-build></script>
+<script src="song/chart-standard.js"></script>
+<script src="song/chart-showcase.js"></script>
+<script src="song/song.js"></script>
+<script src="trackless-tap.js"></script>
+<script src="trackless-notes.js"></script>
+<script src="trackless-audio.js"></script>
+<script src="trackless-touch.js"></script>
+<script src="trackless.js"></script>
