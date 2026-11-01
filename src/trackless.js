@@ -70,7 +70,9 @@
   let ctx = null, master = null, startAt = 0, judge = null, chart = null, events = null, evIdx = 0, running = false;
   const flashes = [], pops = [];
   let lastGrade = null, lastGradeAt = 0;
-  const songTime = () => (ctx ? ctx.currentTime - startAt : 0);
+  const outLatency = () => Math.max(0, Math.min(0.3, (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0));
+  const songTime = () => (ctx ? ctx.currentTime - outLatency() - startAt : 0);
+  const JUDGE_LAG = 0.05;
 
   const Song = window.KiyoameSong;
   const CHART_KEY = 'kiyoame.chart';
@@ -148,7 +150,7 @@
   const EDGE = 18, PALM = 70;
 
   const TOUCH_KEY = 'kiyoame.trackless.touch';
-  let touchZone = 'near';
+  let touchZone = 'half';
   try { const v = localStorage.getItem(TOUCH_KEY); if (v === 'near' || v === 'half' || v === 'full') touchZone = v; } catch (e) {}
 
   const nearHalf = () => (Math.max(96, Math.min(140, H * 0.17)) + 0.10 * H) / 2;
@@ -162,7 +164,8 @@
   }
   function feed(kind, e) {
     if (!running || events) return;
-    const L = layout(), cell = cellOfX(e.clientX, L), t = songTime();
+    const age = Math.max(0, Math.min(JUDGE_LAG, (performance.now() - e.timeStamp) / 1000));
+    const L = layout(), cell = cellOfX(e.clientX, L), t = Math.max(judge.time, songTime() - age);
     const area = touchBounds(L);
     judge.rows = area.rows; judge.rowTop = area.top / H; judge.rowBottom = area.bottom / H;
     const yy = e.clientY / H;
@@ -171,7 +174,7 @@
     else if (kind === 'up' && down.has(e.pointerId)) { down.delete(e.pointerId); judge.up(e.pointerId, t); }
   }
   canvas.addEventListener('pointerdown', e => { e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} feed('down', e); });
-  canvas.addEventListener('pointermove', e => { e.preventDefault(); feed('move', e); });
+  canvas.addEventListener('pointermove', e => { e.preventDefault(); for (const m of (e.getCoalescedEvents && e.getCoalescedEvents().length ? e.getCoalescedEvents() : [e])) feed('move', m); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(ev, e => feed('up', e));
   addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('visibilitychange', () => { if (document.hidden) pauseRun(); });
@@ -442,7 +445,7 @@
         if (e.k === 'down') judge.down(e.id, e.x, e.t); else if (e.k === 'move') judge.move(e.id, e.x, e.t); else judge.up(e.id, e.t);
       }
     }
-    judge.advance(Math.max(now - 0.0, judge.time));
+    judge.advance(Math.max(now - JUDGE_LAG, judge.time));
     drawNotes(Lo, now);
     drawJudge(Lo, perf);
     drawHud(perf);

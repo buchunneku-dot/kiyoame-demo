@@ -5,7 +5,8 @@
   const MIN_WIDTH = 1;
   const DEFAULTS = Object.freeze({
     perfect: 0.060, great: 0.100, good: 0.150,
-    releaseTolerance: 0.060,
+    releaseTolerance: 0.150,
+    reach: 1,
     chainGap: 0.300,
     dragWindow: 0.150,
 
@@ -192,7 +193,7 @@
       if (this.onResult) this.onResult(r, n);
     }
 
-    anyInside(r) { for (const c of this.contacts.values()) if (inside(r, c.x)) return true; return false; }
+    anyInside(r) { const k = this.p.reach; for (const c of this.contacts.values()) if (c.x >= r.x - k && c.x < r.x + r.width + k) return true; return false; }
 
     down(id, x, t, y) {
       this.advance(t);
@@ -239,9 +240,10 @@
         const lo = Math.max(t0, n.time - p.dragWindow), hi = Math.min(t1, n.time + p.dragWindow);
         if (hi < lo - 1e-9) continue;
         let a = lo, b = hi;
-        if (Math.abs(x1 - x0) < 1e-9 || t1 - t0 < 1e-9) { if (!(x1 >= n.x && x1 < n.x + n.width)) continue; }
+        const dl = n.x - p.reach, dr = n.x + n.width + p.reach;
+        if (Math.abs(x1 - x0) < 1e-9 || t1 - t0 < 1e-9) { if (!(x1 >= dl && x1 < dr)) continue; }
         else {
-          const at = x => t0 + (x - x0) / (x1 - x0) * (t1 - t0), ta = at(n.x), tb = at(n.x + n.width);
+          const at = x => t0 + (x - x0) / (x1 - x0) * (t1 - t0), ta = at(dl), tb = at(dr);
           a = Math.max(a, Math.min(ta, tb)); b = Math.min(b, Math.max(ta, tb));
           if (b < a - 1e-9) continue;
         }
@@ -263,14 +265,16 @@
         const ta = t0 + (t1 - t0) * s0, tb = t0 + (t1 - t0) * s1;
         if (c.cell !== key) { c.cell = key; c.cellClaimed = false; }
         if (c.cellClaimed) continue;
-        let best = null, bestA = Infinity;
+        let best = null, bestA = Infinity, bestOff = Infinity;
+        const reach = dx === 0 ? p.reach : 0;
         for (const n of this.notes) {
           if (n.head !== null || n.type === 'Drag') continue;
           if (n.time - n.early > tb + 1e-9) break;
-          if (!(col >= n.x && col < n.x + n.width)) continue;
+          const off = col < n.x ? n.x - col : col >= n.x + n.width ? col - n.x - n.width + 1 : 0;
+          if (off > reach) continue;
           const a = Math.max(ta, n.time - n.early), b = Math.min(tb, n.time + n.late);
           if (b < a - 1e-9) continue;
-          if (a < bestA) { bestA = a; best = n; }
+          if (off < bestOff || (off === bestOff && a < bestA)) { bestA = a; bestOff = off; best = n; }
         }
         if (best) { this.claim(best, id, bestA - best.time); c.cellClaimed = true; claimed = true; }
       }
