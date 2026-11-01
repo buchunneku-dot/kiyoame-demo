@@ -97,7 +97,8 @@
   const MIN_WIDTH = 1;
   const DEFAULTS = Object.freeze({
     perfect: 0.060, great: 0.100, good: 0.150,
-    releaseTolerance: 0.060,
+    releaseTolerance: 0.150,
+    reach: 1,
     chainGap: 0.300,
     dragWindow: 0.150,
 
@@ -284,7 +285,7 @@
       if (this.onResult) this.onResult(r, n);
     }
 
-    anyInside(r) { for (const c of this.contacts.values()) if (inside(r, c.x)) return true; return false; }
+    anyInside(r) { const k = this.p.reach; for (const c of this.contacts.values()) if (c.x >= r.x - k && c.x < r.x + r.width + k) return true; return false; }
 
     down(id, x, t, y) {
       this.advance(t);
@@ -331,9 +332,10 @@
         const lo = Math.max(t0, n.time - p.dragWindow), hi = Math.min(t1, n.time + p.dragWindow);
         if (hi < lo - 1e-9) continue;
         let a = lo, b = hi;
-        if (Math.abs(x1 - x0) < 1e-9 || t1 - t0 < 1e-9) { if (!(x1 >= n.x && x1 < n.x + n.width)) continue; }
+        const dl = n.x - p.reach, dr = n.x + n.width + p.reach;
+        if (Math.abs(x1 - x0) < 1e-9 || t1 - t0 < 1e-9) { if (!(x1 >= dl && x1 < dr)) continue; }
         else {
-          const at = x => t0 + (x - x0) / (x1 - x0) * (t1 - t0), ta = at(n.x), tb = at(n.x + n.width);
+          const at = x => t0 + (x - x0) / (x1 - x0) * (t1 - t0), ta = at(dl), tb = at(dr);
           a = Math.max(a, Math.min(ta, tb)); b = Math.min(b, Math.max(ta, tb));
           if (b < a - 1e-9) continue;
         }
@@ -355,14 +357,16 @@
         const ta = t0 + (t1 - t0) * s0, tb = t0 + (t1 - t0) * s1;
         if (c.cell !== key) { c.cell = key; c.cellClaimed = false; }
         if (c.cellClaimed) continue;
-        let best = null, bestA = Infinity;
+        let best = null, bestA = Infinity, bestOff = Infinity;
+        const reach = dx === 0 ? p.reach : 0;
         for (const n of this.notes) {
           if (n.head !== null || n.type === 'Drag') continue;
           if (n.time - n.early > tb + 1e-9) break;
-          if (!(col >= n.x && col < n.x + n.width)) continue;
+          const off = col < n.x ? n.x - col : col >= n.x + n.width ? col - n.x - n.width + 1 : 0;
+          if (off > reach) continue;
           const a = Math.max(ta, n.time - n.early), b = Math.min(tb, n.time + n.late);
           if (b < a - 1e-9) continue;
-          if (a < bestA) { bestA = a; best = n; }
+          if (off < bestOff || (off === bestOff && a < bestA)) { bestA = a; bestOff = off; best = n; }
         }
         if (best) { this.claim(best, id, bestA - best.time); c.cellClaimed = true; claimed = true; }
       }
@@ -976,7 +980,9 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
   let ctx = null, master = null, startAt = 0, judge = null, chart = null, events = null, evIdx = 0, running = false;
   const flashes = [], pops = [];
   let lastGrade = null, lastGradeAt = 0;
-  const songTime = () => (ctx ? ctx.currentTime - startAt : 0);
+  const outLatency = () => Math.max(0, Math.min(0.3, (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0));
+  const songTime = () => (ctx ? ctx.currentTime - outLatency() - startAt : 0);
+  const JUDGE_LAG = 0.05;
 
   const Song = window.KiyoameSong;
   const CHART_KEY = 'kiyoame.chart';
@@ -1054,7 +1060,7 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
   const EDGE = 18, PALM = 70;
 
   const TOUCH_KEY = 'kiyoame.trackless.touch';
-  let touchZone = 'near';
+  let touchZone = 'half';
   try { const v = localStorage.getItem(TOUCH_KEY); if (v === 'near' || v === 'half' || v === 'full') touchZone = v; } catch (e) {}
 
   const nearHalf = () => (Math.max(96, Math.min(140, H * 0.17)) + 0.10 * H) / 2;
@@ -1068,7 +1074,8 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
   }
   function feed(kind, e) {
     if (!running || events) return;
-    const L = layout(), cell = cellOfX(e.clientX, L), t = songTime();
+    const age = Math.max(0, Math.min(JUDGE_LAG, (performance.now() - e.timeStamp) / 1000));
+    const L = layout(), cell = cellOfX(e.clientX, L), t = Math.max(judge.time, songTime() - age);
     const area = touchBounds(L);
     judge.rows = area.rows; judge.rowTop = area.top / H; judge.rowBottom = area.bottom / H;
     const yy = e.clientY / H;
@@ -1077,7 +1084,7 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
     else if (kind === 'up' && down.has(e.pointerId)) { down.delete(e.pointerId); judge.up(e.pointerId, t); }
   }
   canvas.addEventListener('pointerdown', e => { e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} feed('down', e); });
-  canvas.addEventListener('pointermove', e => { e.preventDefault(); feed('move', e); });
+  canvas.addEventListener('pointermove', e => { e.preventDefault(); for (const m of (e.getCoalescedEvents && e.getCoalescedEvents().length ? e.getCoalescedEvents() : [e])) feed('move', m); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(ev, e => feed('up', e));
   addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('visibilitychange', () => { if (document.hidden) pauseRun(); });
@@ -1348,7 +1355,7 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
         if (e.k === 'down') judge.down(e.id, e.x, e.t); else if (e.k === 'move') judge.move(e.id, e.x, e.t); else judge.up(e.id, e.t);
       }
     }
-    judge.advance(Math.max(now - 0.0, judge.time));
+    judge.advance(Math.max(now - JUDGE_LAG, judge.time));
     drawNotes(Lo, now);
     drawJudge(Lo, perf);
     drawHud(perf);

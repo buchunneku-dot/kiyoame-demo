@@ -37,7 +37,18 @@ eq(grade(0.15).GOOD, 1, '±150 ms is GOOD');
 eq(grade(0.16).MISS, 1, 'beyond 150 ms is MISS');
 eq(grade(0, 5).MISS, 1, 'a press outside the range misses');
 eq(grade(0, 2.99).PERFECT, 1, 'any position inside the range hits (no distance-from-centre scoring)');
-eq(grade(0, 3).MISS, 1, 'the right edge of a range is open');
+eq(grade(0, 3).PERFECT, 1, 'a press one cell past the edge still hits (finger width)');
+eq(grade(0, 4).MISS, 1, 'two cells past the edge misses');
+{
+  const j = new T.Judge(chart([tap('e', 1, 3, 3), tap('f', 1, 15, 3)]));
+  j.down('p', 6, 1); j.down('q', 16, 1); j.up('p', 1.05); j.up('q', 1.05);
+  eq(j.finish().counts.PERFECT, 2, 'chord: a finger landing on the edge of a note still takes it');
+}
+{
+  const j = new T.Judge(chart([tap('l', 1, 3, 3), tap('r', 1, 7, 3)]));
+  j.down('p', 6.5, 1); j.up('p', 1.05);
+  const r = j.finish(); eq(r.counts.PERFECT + r.counts.MISS, 2, 'between two notes a press takes only one of them');
+}
 {
   const j = new T.Judge(chart([tap('a', 5, 0, 3), tap('b', 5.05, 3, 3)]));
   j.down('p', 4, 5.04);
@@ -67,7 +78,7 @@ const hold = { id: 'h', type: 'Hold', layer: 'lower', time: 2, end: 4, x: 6, wid
   const w = run([hold], j => { j.down('p', 7, 2); j.move('p', 20, 3.5); j.up('p', 4.01); });
   eq(w.counts.MISS, 1, 'not in the range at the end: tail MISS');
   const x = run([hold], j => { j.down('p', 7, 2); j.up('p', 3.95); });
-  eq(x.counts.PERFECT, 2, 'released 50 ms before the end (within 60 ms): counts as held');
+  eq(x.counts.PERFECT, 2, 'released 50 ms before the end (within 150 ms): counts as held');
 }
 {
   const s = run([hold], j => {});
@@ -304,9 +315,10 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
 
   const endEarly = (type, ms) => { const jj = new T.Judge(chart([hold(type)])); jj.down('f', 7, 2); jj.up('f', 4 - ms / 1000); return jj.finish().counts; };
   eq(endEarly('Hold', 50).PERFECT, 2, 'released 50 ms before the end: counts as held');
-  eq(endEarly('Hold', 100).MISS, 1, 'control: a plain Hold released 100 ms early: tail MISS');
-  eq(endEarly('ExHold', 100).PERFECT, 2, 'ExHold has double tolerance (120 ms): released 100 ms early still counts');
-  eq(endEarly('ExHold', 150).MISS, 1, 'but not beyond 120 ms');
+  eq(endEarly('Hold', 100).PERFECT, 2, 'released 100 ms before the end: still held (150 ms tolerance)');
+  eq(endEarly('Hold', 200).MISS, 1, 'control: a plain Hold released 200 ms early: tail MISS');
+  eq(endEarly('ExHold', 250).PERFECT, 2, 'ExHold has double tolerance (300 ms): released 250 ms early still counts');
+  eq(endEarly('ExHold', 350).MISS, 1, 'but not beyond 300 ms');
   eq(T.slotCount(hold('ExHold')), 2, 'ExHold is still two judgements');
   const sl = type => ({ id: 's', type, layer: 'upper', time: 2, end: 4, x: 0, width: 3, path: [{ t: 2, x: 0, width: 3 }, { t: 4, x: 18, width: 3 }] });
   const ev = chart([sl('ExSlide')]);
