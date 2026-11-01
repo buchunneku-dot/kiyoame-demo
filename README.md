@@ -6,6 +6,8 @@
 
 The game is built in Unity 6 (URP) with a cel-shaded look. This repository holds the **demo video** and a **playable web prototype** of the rhythm mode.
 
+**[Play the web prototype in your browser](https://buchunneku-dot.github.io/kiyoame-demo/)** · **[Watch the demo video](https://github.com/buchunneku-dot/kiyoame-demo/releases/latest)**
+
 ## Demo video
 
 The 54-second demo is attached to the [latest release](https://github.com/buchunneku-dot/kiyoame-demo/releases/latest). It was captured in engine and shows the town by day and by night, a few interiors, and two stretches of rhythm play.
@@ -23,7 +25,8 @@ The rhythm mode as a single web page, with one song: **Kiyoame Theme** (120 BPM,
 
 ### Start playing
 
-- Download or clone this repository and open [`play/index.html`](play/index.html) in a desktop or mobile browser. It is one self-contained file with the music built in, so no server or install is needed.
+- Play online at **https://buchunneku-dot.github.io/kiyoame-demo/**.
+- Or download this repository and open [`play/index.html`](play/index.html) in a desktop or mobile browser. It is one self-contained file with the music built in, so no server or install is needed.
 - Chrome, Edge, Firefox and Safari all work. Play in landscape, and use headphones if you can.
 
 On the home screen, pick a chart and press **Start**:
