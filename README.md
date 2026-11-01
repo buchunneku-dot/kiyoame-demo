@@ -34,7 +34,7 @@ On the home screen, pick a chart and press **Start**:
 | Chart | Notes | For |
 |---|---|---|
 | **Standard** | 247 | A first play: the melody plus light decoration. |
-| **Showcase** | 437 | The full arrangement: chords, short stairs, hand-to-hand runs and sixteenths in the choruses. |
+| **Showcase** | 351 | The full arrangement: chords, short stairs, hand-to-hand runs and sixteenths in the choruses. |
 
 ### Controls
 
