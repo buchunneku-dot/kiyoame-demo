@@ -13,7 +13,7 @@
   const FONT = 'Montserrat,system-ui,sans-serif';
   const spaced = px => { if ('letterSpacing' in g) g.letterSpacing = px; };
 
-  const SPEED_MIN = 1.0, SPEED_MAX = 12.0, SPEED_DEFAULT = 5.0, SPEED_KEY = 'kiyoame.trackless.speed';
+  const SPEED_MIN = 1.0, SPEED_MAX = 20.0, SPEED_DEFAULT = 5.0, SPEED_KEY = 'kiyoame.trackless.speed';
 
   const speeds = { upper: SPEED_DEFAULT, lower: SPEED_DEFAULT };
   let projSync = false;
@@ -80,8 +80,23 @@
   try { if (Song.charts.includes(localStorage.getItem(CHART_KEY))) chartName = localStorage.getItem(CHART_KEY); } catch (e) {}
   const goButtons = () => [...document.querySelectorAll('.go'), $('again')];
   let starting = false, lastClock = 0, lastClockAt = 0;
+  const canFullscreen = () => !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  function enterFullscreen() {
+    const el = document.documentElement;
+    if (isFullscreen() || !canFullscreen()) return;
+    try {
+      const r = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen();
+      if (r && r.then) r.then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); }).catch(() => {});
+    } catch (e) {}
+  }
+  const onFullscreenChange = () => { if (!isFullscreen() && canFullscreen()) pauseRun('Fullscreen was closed. Press Start to play again.'); };
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
   async function startRun() {
     if (starting) return;
+    enterFullscreen();
     starting = true;
     const status = $('start-status');
     status.textContent = 'Starting audio…';
