@@ -7,7 +7,6 @@
     perfect: 0.060, great: 0.100, good: 0.150,
     releaseTolerance: 0.150,
     reach: 1,
-    chainGap: 0.300,
     dragWindow: 0.150,
 
     flowTolerance: 0.040,
@@ -15,6 +14,7 @@
     maxContacts: 2,
   });
   const WEIGHTS = Object.freeze({ PERFECT: 1, GREAT: 0.7, GOOD: 0.4, MISS: 0 });
+  const GRADE_RANK = Object.freeze({ PERFECT: 0, GREAT: 1, GOOD: 2, MISS: 3 });
   const TYPES = Object.freeze(['Tap', 'Hold', 'Slide', 'Drag', 'ExTap', 'ExHold', 'ExSlide', 'Flow', 'ExFlow']);
   const LAYERS = Object.freeze(['upper', 'lower']);
 
@@ -129,6 +129,14 @@
       if (!strokeOf(a, p) && a.type !== 'Drag') continue;
       for (const b of chart.notes) if (smears(a, b, p)) warnings.push(`${a.id} (${a.type}) may brush ${b.id} (${b.type}): their windows and ranges overlap`);
     }
+    const heads = chart.notes.filter(n => n.type !== 'Drag');
+    for (let i = 0; i < heads.length; i++) {
+      for (let k = i + 1; k < heads.length; k++) {
+        const a = heads[i], b = heads[k];
+        if (Math.abs(a.time - b.time) > 1e-6 || a.link === b.id) continue;
+        if (a.x < b.x + b.width && b.x < a.x + a.width) warnings.push(`${a.id} and ${b.id} start at the same moment on overlapping ranges and need two fingers: link them as an upper/lower pair or move them apart`);
+      }
+    }
     for (const n of chart.notes) {
       const hint = LAYER_HINT[n.type];
       if (hint && hint !== n.layer && baseOf(n) === 'Slide') warnings.push(`${n.id}: ${n.type} belongs on the ${hint} layer`);
@@ -213,7 +221,7 @@
         const n = heads[i];
         for (let k = i - 1; k >= 0; k--) {
           const m = heads[k], gap = n.time - m.time;
-          if (gap >= p.chainGap - 1e-9) break;
+          if (gap >= 2 * p.good - 1e-9) break;
           if (gap < 1e-9 || !overlaps(n, m)) continue;
           n.early = Math.min(n.early, gap / 2); m.late = Math.min(m.late, gap / 2);
           break;
@@ -265,7 +273,7 @@
         const ta = t0 + (t1 - t0) * s0, tb = t0 + (t1 - t0) * s1;
         if (c.cell !== key) { c.cell = key; c.cellClaimed = false; }
         if (c.cellClaimed) continue;
-        let best = null, bestA = Infinity, bestOff = Infinity;
+        let best = null, bestA = Infinity, bestOff = Infinity, bestRank = Infinity;
         const reach = dx === 0 ? p.reach : 0;
         for (const n of this.notes) {
           if (n.head !== null || n.type === 'Drag') continue;
@@ -274,7 +282,8 @@
           if (off > reach) continue;
           const a = Math.max(ta, n.time - n.early), b = Math.min(tb, n.time + n.late);
           if (b < a - 1e-9) continue;
-          if (off < bestOff || (off === bestOff && a < bestA)) { bestA = a; bestOff = off; best = n; }
+          const rank = isEx(n) ? 0 : GRADE_RANK[gradeFor(Math.abs(a - n.time), p)];
+          if (off < bestOff || (off === bestOff && (rank < bestRank || (rank === bestRank && a < bestA)))) { bestA = a; bestOff = off; bestRank = rank; best = n; }
         }
         if (best) { this.claim(best, id, bestA - best.time); c.cellClaimed = true; claimed = true; }
       }

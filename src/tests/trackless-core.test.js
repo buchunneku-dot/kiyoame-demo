@@ -50,6 +50,11 @@ eq(grade(0, 4).MISS, 1, 'two cells past the edge misses');
   const r = j.finish(); eq(r.counts.PERFECT + r.counts.MISS, 2, 'between two notes a press takes only one of them');
 }
 {
+  const j = new T.Judge(chart([tap('l', 1, 3, 3), tap('r', 1.12, 7, 3)]));
+  j.down('p', 6.5, 1.11); j.up('p', 1.15);
+  eq(j.finish().counts.PERFECT, 1, 'a press in reach of two notes goes to the one it grades higher');
+}
+{
   const j = new T.Judge(chart([tap('a', 5, 0, 3), tap('b', 5.05, 3, 3)]));
   j.down('p', 4, 5.04);
   const s = j.finish();
@@ -220,9 +225,11 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   eq(grades(rub).A + grades(rub).B, 'PERFECTPERFECT', 'rubbing: both PERFECT');
 
   const loose = new T.Judge(chart([A, { ...B, time: 5.12 }]));
-  eq(Math.round(loose.notes[0].late * 1000), 60, '120 ms apart: split at the midpoint, A late window narrows to 60 ms');
+  eq(Math.round(loose.notes[0].late * 1000), 60, '120 ms apart: the overlap goes to whichever note grades higher, so A late window ends at the midpoint (60 ms)');
+  const edge = new T.Judge(chart([A, { ...B, time: 5.28 }]));
+  eq(Math.round(edge.notes[0].late * 1000), 140, '280 ms apart: windows still overlap, split at 140 ms');
   const far = new T.Judge(chart([A, { ...B, time: 5.3 }]));
-  eq(far.notes[0].late, 0.15, '300 ms apart: no narrowing');
+  eq(far.notes[0].late, 0.15, '300 ms apart: windows no longer overlap, no narrowing');
 
   const early = new T.Judge(chart([A]));
   early.down('f', 8, 4.86); early.up('f', 5.2);
@@ -340,7 +347,8 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   rejects(chart([lo, { ...up, link: undefined }]), /both ways/, 'links must point both ways');
   rejects(chart([lo, { ...up, time: 5.01 }]), /same time/, 'linked notes must be at the same time');
   rejects(chart([lo, { ...up, layer: 'lower' }]), /one upper/, 'one upper and one lower');
-  eq(T.lint(chart([{ ...lo, link: undefined }, { ...up, link: undefined }])).warnings.length, 0, 'same time, overlapping ranges: no link needed (one press hits both)');
+  ok(T.lint(chart([{ ...lo, link: undefined }, { ...up, link: undefined }])).warnings.some(w => /same moment/.test(w)), 'same time, overlapping ranges, not linked: warning');
+  eq(T.lint(chart([{ ...lo, link: undefined }, { ...up, link: undefined, x: 15 }])).warnings.length, 0, 'same time, separate ranges: no warning');
   eq(T.lint(chart([lo, up])).warnings.length, 0, 'linked: no warning');
   rejects(chart([lo, { ...up, x: 15 }]), /ranges overlap/, 'notes whose ranges do not overlap cannot be linked');
   T.validateChart(chart([lo, { ...up, x: 8, width: 3 }]));
