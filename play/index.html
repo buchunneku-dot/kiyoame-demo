@@ -67,9 +67,9 @@
     <h3>SCROLL SPEED</h3>
     <div class="speed">
       <div class="speed-head"><span>Upper layer</span><output id="speed-upper-out"></output></div>
-      <div class="speed-row"><button type="button" id="speed-upper-down" aria-label="Upper layer speed −0.1">−</button><input type="range" id="speed-upper" min="1" max="12" step="0.1"><button type="button" id="speed-upper-up" aria-label="Upper layer speed +0.1">+</button></div>
+      <div class="speed-row"><button type="button" id="speed-upper-down" aria-label="Upper layer speed −0.1">−</button><input type="range" id="speed-upper" min="1" max="20" step="0.1"><button type="button" id="speed-upper-up" aria-label="Upper layer speed +0.1">+</button></div>
       <div class="speed-head"><span>Lower layer</span><output id="speed-lower-out"></output></div>
-      <div class="speed-row"><button type="button" id="speed-lower-down" aria-label="Lower layer speed −0.1">−</button><input type="range" id="speed-lower" min="1" max="12" step="0.1"><button type="button" id="speed-lower-up" aria-label="Lower layer speed +0.1">+</button></div>
+      <div class="speed-row"><button type="button" id="speed-lower-down" aria-label="Lower layer speed −0.1">−</button><input type="range" id="speed-lower" min="1" max="20" step="0.1"><button type="button" id="speed-lower-up" aria-label="Lower layer speed +0.1">+</button></div>
       <label><input type="checkbox" id="proj-sync"> Same speed for both layers</label>
     </div>
     <h3>DISPLAY</h3>
@@ -932,7 +932,7 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
   const FONT = 'Montserrat,system-ui,sans-serif';
   const spaced = px => { if ('letterSpacing' in g) g.letterSpacing = px; };
 
-  const SPEED_MIN = 1.0, SPEED_MAX = 12.0, SPEED_DEFAULT = 5.0, SPEED_KEY = 'kiyoame.trackless.speed';
+  const SPEED_MIN = 1.0, SPEED_MAX = 20.0, SPEED_DEFAULT = 5.0, SPEED_KEY = 'kiyoame.trackless.speed';
 
   const speeds = { upper: SPEED_DEFAULT, lower: SPEED_DEFAULT };
   let projSync = false;
@@ -999,8 +999,23 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
   try { if (Song.charts.includes(localStorage.getItem(CHART_KEY))) chartName = localStorage.getItem(CHART_KEY); } catch (e) {}
   const goButtons = () => [...document.querySelectorAll('.go'), $('again')];
   let starting = false, lastClock = 0, lastClockAt = 0;
+  const canFullscreen = () => !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  function enterFullscreen() {
+    const el = document.documentElement;
+    if (isFullscreen() || !canFullscreen()) return;
+    try {
+      const r = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen();
+      if (r && r.then) r.then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); }).catch(() => {});
+    } catch (e) {}
+  }
+  const onFullscreenChange = () => { if (!isFullscreen() && canFullscreen()) pauseRun('Fullscreen was closed. Press Start to play again.'); };
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
   async function startRun() {
     if (starting) return;
+    enterFullscreen();
     starting = true;
     const status = $('start-status');
     status.textContent = 'Starting audio…';

@@ -27,7 +27,7 @@ The rhythm mode as a single web page, with one song: **Kiyoame Theme** (120 BPM,
 
 - Play online at **https://buchunneku-dot.github.io/kiyoame-demo/**.
 - Or download this repository and open [`play/index.html`](play/index.html) in a desktop or mobile browser. It is one self-contained file with the music built in, so no server or install is needed.
-- Chrome, Edge, Firefox and Safari all work. Play in landscape, and use headphones if you can.
+- Chrome, Edge, Firefox and Safari all work. Play in landscape, and use headphones if you can. Start switches the page to fullscreen; leaving fullscreen pauses the song.
 
 On the home screen, pick a chart and press **Start**:
 
@@ -71,7 +71,7 @@ The score goes up to 1,000,000. The result screen shows accuracy, max combo and 
 
 ### Settings
 
-- **Scroll speed**, set separately for the upper and lower layers, or locked together.
+- **Scroll speed** from 1.0 to 20.0, set separately for the upper and lower layers, or locked together.
 - **Background**: mist or dark.
 - **Touch area**: only near the line, the lower half of the screen, or the full screen.
 - **Grid lines**: lane width, every cell, or off.
