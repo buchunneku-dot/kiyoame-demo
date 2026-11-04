@@ -96,7 +96,7 @@
   const CELLS = 24;
   const MIN_WIDTH = 1;
   const DEFAULTS = Object.freeze({
-    perfect: 0.060, great: 0.100, good: 0.150,
+    perfect: 0.040, great: 0.070, good: 0.100,
     releaseTolerance: 0.150,
     reach: 1,
     dragWindow: 0.150,
@@ -207,7 +207,7 @@
     }
     const s = strokeOf(a, p);
     if (!s || a === b || b.type === 'Drag') return false;
-    const headStart = b.time - p.good, headEnd = b.time + p.good;
+    const headStart = b.time - p.great, headEnd = b.time + p.good;
     if (headEnd < s.t0 || headStart > s.t1) return false;
     return b.x < s.r && s.l < b.x + b.width;
   }
@@ -307,13 +307,13 @@
     protectWindows() {
       const p = this.p;
       const heads = this.notes.filter(n => n.type !== 'Drag');
-      for (const n of heads) { n.early = p.good; n.late = p.good; }
+      for (const n of heads) { n.early = p.great; n.late = p.good; }
       const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width;
       for (let i = 0; i < heads.length; i++) {
         const n = heads[i];
         for (let k = i - 1; k >= 0; k--) {
           const m = heads[k], gap = n.time - m.time;
-          if (gap >= 2 * p.good - 1e-9) break;
+          if (gap >= p.great + p.good - 1e-9) break;
           if (gap < 1e-9 || !overlaps(n, m)) continue;
           n.early = Math.min(n.early, gap / 2); m.late = Math.min(m.late, gap / 2);
           break;
@@ -363,13 +363,18 @@
         const s0 = cuts[i], s1 = cuts[i + 1], mid = (s0 + s1) / 2;
         const col = Math.floor(x0 + dx * mid + 1e-9), row = hasY ? rowOf(y0 + (y1 - y0) * mid) : 0, key = col + ',' + row;
         const ta = t0 + (t1 - t0) * s0, tb = t0 + (t1 - t0) * s1;
-        if (c.cell !== key) { c.cell = key; c.cellClaimed = false; }
+        if (c.cell !== key) { c.cell = key; c.cellClaimed = false; c.cellAt = ta; }
         if (c.cellClaimed) continue;
         let best = null, bestA = Infinity, bestOff = Infinity, bestRank = Infinity;
-        const reach = dx === 0 ? p.reach : 0;
+        let reach = dx === 0 ? p.reach : 0;
+        if (reach > 0) for (const n of this.notes) {
+          if (n.time - tb > p.good + 1e-9) break;
+          if (n.head === null && n.type !== 'Drag' && n.time + n.late >= ta && col >= n.x && col < n.x + n.width) { reach = 0; break; }
+        }
         for (const n of this.notes) {
           if (n.head !== null || n.type === 'Drag') continue;
           if (n.time - n.early > tb + 1e-9) break;
+          if (n.time - n.early > c.cellAt + 1e-9) continue;
           const off = col < n.x ? n.x - col : col >= n.x + n.width ? col - n.x - n.width + 1 : 0;
           if (off > reach) continue;
           const a = Math.max(ta, n.time - n.early), b = Math.min(tb, n.time + n.late);
