@@ -65,6 +65,8 @@ The game uses a **mouse or a touch screen**. There is no keyboard input.
 | GOOD | within ±150 ms |
 | MISS | later or not hit |
 
+When two notes' timing windows overlap, a touch goes to the note it would grade higher. A finger that lands up to one cell outside a note still hits it. Holds can be let go up to 150 ms early (300 ms for Ex Hold).
+
 The score goes up to 1,000,000. The result screen shows accuracy, max combo and the grade counts for each layer.
 
 ### Settings
