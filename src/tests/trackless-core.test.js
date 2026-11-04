@@ -31,10 +31,23 @@ const grade = (dt, x = 1) => {
   j.down('p', x, 5 + dt); j.up('p', 5 + dt + 0.02);
   return j.finish().counts;
 };
-eq(grade(0.06).PERFECT, 1, '±60 ms is PERFECT');
-eq(grade(-0.1).GREAT, 1, '±100 ms is GREAT');
-eq(grade(0.15).GOOD, 1, '±150 ms is GOOD');
-eq(grade(0.16).MISS, 1, 'beyond 150 ms is MISS');
+eq(grade(0.04).PERFECT, 1, '±40 ms is PERFECT');
+eq(grade(-0.04).PERFECT, 1, '40 ms early is PERFECT');
+eq(grade(0.07).GREAT, 1, '±70 ms is GREAT');
+eq(grade(-0.07).GREAT, 1, '70 ms early is GREAT');
+eq(grade(0.1).GOOD, 1, 'up to 100 ms late is GOOD');
+eq(grade(0.11).MISS, 1, 'beyond 100 ms late is MISS');
+{
+  const j = new T.Judge(chart([tap('a', 5, 0, 3)]));
+  j.down('p', 1, 4.9); j.up('p', 4.92); j.down('q', 1, 5.0); j.up('q', 5.02);
+  const r = j.finish().counts;
+  eq(r.PERFECT, 1, 'no early GOOD or MISS: a touch 100 ms early is ignored and a later touch still takes the note');
+}
+{
+  const j = new T.Judge(chart([tap('a', 5, 0, 3)]));
+  j.down('p', 1, 4.9); j.up('p', 5.1);
+  eq(j.finish().counts.MISS, 1, 'a finger resting since before the window opened does not take the note');
+}
 eq(grade(0, 5).MISS, 1, 'a press outside the range misses');
 eq(grade(0, 2.99).PERFECT, 1, 'any position inside the range hits (no distance-from-centre scoring)');
 eq(grade(0, 3).PERFECT, 1, 'a press one cell past the edge still hits (finger width)');
@@ -53,6 +66,14 @@ eq(grade(0, 4).MISS, 1, 'two cells past the edge misses');
   const j = new T.Judge(chart([tap('l', 1, 3, 3), tap('r', 1.12, 7, 3)]));
   j.down('p', 6.5, 1.11); j.up('p', 1.15);
   eq(j.finish().counts.PERFECT, 1, 'a press in reach of two notes goes to the one it grades higher');
+}
+{
+  const alone = new T.Judge(chart([tap('a', 1, 3, 3)]));
+  alone.down('p', 6.2, 1); alone.up('p', 1.03);
+  eq(alone.finish().counts.PERFECT, 1, 'control: one cell past the edge, nothing else around: the margin takes the note');
+  const j = new T.Judge(chart([tap('a', 1, 3, 3), tap('u', 1.1, 6, 3)]));
+  j.down('p', 6.2, 1); j.up('p', 1.03); j.finish();
+  eq(j.results.find(r => r.noteId === 'a').grade, 'MISS', 'no margin when the finger is on a note coming up next: the neighbour is not taken');
 }
 {
   const j = new T.Judge(chart([tap('a', 5, 0, 3), tap('b', 5.05, 3, 3)]));
@@ -122,8 +143,8 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   const s = T.play(new T.Judge(c), T.autoplayEvents(c));
   eq(s.counts.PERFECT, s.slots, 'auto play is all PERFECT');
   eq(s.score, 1000000, 'all PERFECT scores 1,000,000');
-  const jitter = T.play(new T.Judge(c), T.autoplayEvents(c, n => (n.id === 'a' ? 0.08 : 0)));
-  eq(jitter.counts.GREAT, 1, '80 ms off is GREAT');
+  const jitter = T.play(new T.Judge(c), T.autoplayEvents(c, n => (n.id === 'a' ? 0.06 : 0)));
+  eq(jitter.counts.GREAT, 1, '60 ms off is GREAT');
   ok(jitter.accuracy < 1 && jitter.accuracy > 0.9, 'accuracy is weighted');
 }
 
@@ -205,7 +226,8 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   const j = new T.Judge(chart([A, B]));
   eq(Math.round(j.notes[0].late * 1000), 38, 'A late window narrows to half the gap');
   eq(Math.round(j.notes[1].early * 1000), 38, 'B early window narrows to half the gap');
-  eq(j.notes[0].early, 0.15, 'a side with no overlapping neighbour keeps its window');
+  eq(j.notes[0].early, 0.07, 'a side with no overlapping neighbour keeps its window (70 ms early)');
+  eq(j.notes[1].late, 0.1, 'and 100 ms late');
 
   const late = new T.Judge(chart([A, B]));
   late.down('f', 8, 5.06); late.up('f', 5.1);
@@ -226,18 +248,18 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
 
   const loose = new T.Judge(chart([A, { ...B, time: 5.12 }]));
   eq(Math.round(loose.notes[0].late * 1000), 60, '120 ms apart: the overlap goes to whichever note grades higher, so A late window ends at the midpoint (60 ms)');
-  const edge = new T.Judge(chart([A, { ...B, time: 5.28 }]));
-  eq(Math.round(edge.notes[0].late * 1000), 140, '280 ms apart: windows still overlap, split at 140 ms');
-  const far = new T.Judge(chart([A, { ...B, time: 5.3 }]));
-  eq(far.notes[0].late, 0.15, '300 ms apart: windows no longer overlap, no narrowing');
+  const edge = new T.Judge(chart([A, { ...B, time: 5.16 }]));
+  eq(Math.round(edge.notes[0].late * 1000), 80, '160 ms apart: windows still overlap, split at 80 ms');
+  const far = new T.Judge(chart([A, { ...B, time: 5.17 }]));
+  eq(far.notes[0].late, 0.1, '170 ms apart: windows no longer overlap (100 late + 70 early), no narrowing');
 
   const early = new T.Judge(chart([A]));
-  early.down('f', 8, 4.86); early.up('f', 5.2);
-  eq(early.finish().counts.GOOD, 1, 'an unprotected note touched 140 ms early is GOOD');
+  early.down('f', 8, 4.94); early.up('f', 4.97);
+  eq(early.finish().counts.GREAT, 1, 'an unprotected note touched 60 ms early is GREAT');
 
   const sl = { ...slide, time: 2, end: 4 };
   const s2 = run([sl], j2 => { j2.down('p', 15, 1); j2.move('p', 5, 1.9); j2.move('p', 1, 2); for (let i = 1; i <= 100; i++) j2.move('p', 1 + (T.rangeAt(sl, 2 + i * 0.02).x - 0) + 1.4, 2 + i * 0.02); j2.up('p', 4.01); });
-  eq(s2.counts.PERFECT, 2, 'a Slide can be entered by rubbing into its head, then followed');
+  eq(s2.counts.MISS, 0, 'a Slide can be entered by rubbing into its head, then followed');
 }
 
 {
@@ -280,12 +302,12 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
 {
   const ex = (id, time, x = 6, width = 3) => ({ id, type: 'ExTap', layer: 'lower', time, x, width });
   const at = (dt, x = 7) => { const j = new T.Judge(chart([ex('e', 5)])); j.down('f', x, 5 + dt); j.up('f', 5 + dt + 0.02); return j.finish().counts; };
-  eq(at(0.14).PERFECT, 1, 'ExTap touched 140 ms late is PERFECT');
-  eq(at(-0.14).PERFECT, 1, 'ExTap touched 140 ms early is PERFECT');
-  eq(at(0.16).MISS, 1, 'beyond the 150 ms window is a miss');
+  eq(at(0.09).PERFECT, 1, 'ExTap touched 90 ms late is PERFECT');
+  eq(at(-0.065).PERFECT, 1, 'ExTap touched 65 ms early is PERFECT');
+  eq(at(0.11).MISS, 1, 'beyond the 100 ms late window is a miss');
   eq(at(0, 20).MISS, 1, 'not touching the range is a miss');
 
-  const tp = new T.Judge(chart([tap('t', 5, 6, 3)])); tp.down('f', 7, 5.14); tp.up('f', 5.16);
+  const tp = new T.Judge(chart([tap('t', 5, 6, 3)])); tp.down('f', 7, 5.09); tp.up('f', 5.11);
   eq(tp.finish().counts.GOOD, 1, 'control: a plain Tap with the same offset is GOOD');
 
   const pair = new T.Judge(chart([ex('a', 5), tap('b', 5.075, 6, 3)]));
@@ -316,9 +338,9 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
     j.up('f', 4.01);
     return j.finish().counts;
   };
-  eq(run1('Hold', 0.14, 0).GOOD, 1, 'control: a plain Hold 140 ms late has a GOOD head');
-  eq(run1('ExHold', 0.14, 0).PERFECT, 2, 'ExHold 140 ms late: head PERFECT, tail PERFECT');
-  eq(run1('ExHold', -0.14, 0).PERFECT, 2, 'ExHold 140 ms early: the same');
+  eq(run1('Hold', 0.09, 0).GOOD, 1, 'control: a plain Hold 90 ms late has a GOOD head');
+  eq(run1('ExHold', 0.09, 0).PERFECT, 2, 'ExHold 90 ms late: head PERFECT, tail PERFECT');
+  eq(run1('ExHold', -0.065, 0).PERFECT, 2, 'ExHold 65 ms early: the same');
 
   const endEarly = (type, ms) => { const jj = new T.Judge(chart([hold(type)])); jj.down('f', 7, 2); jj.up('f', 4 - ms / 1000); return jj.finish().counts; };
   eq(endEarly('Hold', 50).PERFECT, 2, 'released 50 ms before the end: counts as held');
@@ -330,11 +352,11 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   const sl = type => ({ id: 's', type, layer: 'upper', time: 2, end: 4, x: 0, width: 3, path: [{ t: 2, x: 0, width: 3 }, { t: 4, x: 18, width: 3 }] });
   const ev = chart([sl('ExSlide')]);
   const j = new T.Judge(ev);
-  const events = T.autoplayEvents(ev).map(e => (e.k === 'down' ? { ...e, t: e.t + 0.13 } : e));
-  eq(T.play(j, events.sort((p, q) => p.t - q.t)).counts.PERFECT, 2, 'ExSlide: head touched 130 ms late is PERFECT');
+  const events = T.autoplayEvents(ev).map(e => (e.k === 'down' ? { ...e, t: e.t + 0.09 } : e));
+  eq(T.play(j, events.sort((p, q) => p.t - q.t)).counts.PERFECT, 2, 'ExSlide: head touched 90 ms late is PERFECT');
   const j2 = new T.Judge(chart([sl('Slide')]));
-  const e2 = T.autoplayEvents(chart([sl('Slide')])).map(e => (e.k === 'down' ? { ...e, t: e.t + 0.13 } : e));
-  eq(T.play(j2, e2.sort((p, q) => p.t - q.t)).counts.GOOD, 1, 'control: a plain Slide 130 ms late has a GOOD head');
+  const e2 = T.autoplayEvents(chart([sl('Slide')])).map(e => (e.k === 'down' ? { ...e, t: e.t + 0.09 } : e));
+  eq(T.play(j2, e2.sort((p, q) => p.t - q.t)).counts.GOOD, 1, 'control: a plain Slide 90 ms late has a GOOD head');
   ok(T.isEx(sl('ExSlide')) && !T.isEx(sl('Slide')) && T.baseOf(sl('ExSlide')) === 'Slide', 'Ex types are recognised');
 }
 
@@ -401,8 +423,8 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   j = new T.Judge(chart([flow('scrub')])); j.down('a', 9, 2); for (let t = 2.02, k = 0; t <= 4.0; t += 0.02, k++) j.move('a', 9 + 0.1 * Math.sin(k), t); j.up('a', 4.05); j.finish();
   eq(grades(j).filter(x => x === 'MISS').length, 8, 'scrub: small jitter (< half the width) is not rubbing');
 
-  j = new T.Judge(chart([flow('hold', { type: 'ExFlow' })])); j.down('a', 8, 2.14); j.up('a', 4.05); s = j.finish();
-  eq(j.results.find(r => r.part === 'head').grade, 'PERFECT', 'ExFlow head 140 ms late is PERFECT');
+  j = new T.Judge(chart([flow('hold', { type: 'ExFlow' })])); j.down('a', 8, 2.09); j.up('a', 4.05); s = j.finish();
+  eq(j.results.find(r => r.part === 'head').grade, 'PERFECT', 'ExFlow head 90 ms late is PERFECT');
 
   const c = chart([flow('hold'), { ...flow('scrub'), id: 'g', layer: 'upper', time: 6, end: 8, x: 12 }]);
   eq(T.play(new T.Judge(c), T.autoplayEvents(c)).counts.MISS, 0, 'auto play clears both Flow modes without a MISS');
@@ -446,8 +468,10 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   eq(g(j).up, 'MISS', 'y below the band clamps to the last row, no extra cell');
 
   const run = [5, 5.2, 5.4, 5.6].map((time, i) => ({ id: 'r' + i, type: 'Tap', layer: 'lower', time, x: 6, width: 3 }));
-  j = mk(j => { j.down('a', 7.5, 4.9, 0.9); j.up('a', 5.8); }, run);
+  j = mk(j => { j.down('a', 7.5, 4.97, 0.9); j.up('a', 5.8); }, run);
   eq(j.results.filter(r => r.grade !== 'MISS').length, 1, 'holding still: of 4 passing notes only 1 is taken (no resting catch)');
+  j = mk(j => { j.down('a', 7.5, 4.9, 0.9); j.up('a', 5.8); }, run);
+  eq(j.results.filter(r => r.grade !== 'MISS').length, 0, 'pressed before the first window opened and held: none are taken');
 
   j = new T.Judge(chart([{ id: 'n', type: 'Tap', layer: 'lower', time: 9, x: 6, width: 3 }]));
   for (let i = 0; i < 12; i++) { j.down('m', 20, 8 + i * 0.05); j.up('m', 8.02 + i * 0.05); }
