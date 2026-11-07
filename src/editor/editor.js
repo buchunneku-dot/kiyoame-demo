@@ -3,6 +3,8 @@
 
   const T = window.KiyoameTrackless, Song = window.KiyoameSong, M = window.KiyoameEditorModel, V = window.KiyoameEditorView;
   const $ = id => document.getElementById(id);
+  const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const GAME_PAGE = (document.querySelector('meta[name="kiyoame-game"]') || {}).content || 'index.html';
   const DRAFT_KEY = 'kiyoame.editor.draft', TEST_KEY = 'kiyoame.editorChart';
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
@@ -67,7 +69,7 @@
     }
     const n = doc.byId([...selected][0]), base = M.baseType(n.type), ex = M.exOf(n.type);
     let html = '<div class="props">';
-    html += field('ID', `<input type="text" value="${n.id}" disabled>`);
+    html += field('ID', `<input type="text" value="${escapeHtml(n.id)}" disabled>`);
     html += field('Type', `<select data-key="base">${['Tap', 'Hold', 'Slide', 'Flow', 'Drag'].map(t => `<option${t === base ? ' selected' : ''}>${t}</option>`).join('')}</select>`);
     if (base !== 'Drag') html += field('Ex', `<input type="checkbox" data-key="ex"${ex ? ' checked' : ''} style="width:auto">`);
     html += field('Layer', `<select data-key="layer"><option value="upper"${n.layer === 'upper' ? ' selected' : ''}>Upper</option><option value="lower"${n.layer === 'lower' ? ' selected' : ''}>Lower</option></select>`);
@@ -79,7 +81,7 @@
       html += field('Mode', `<select data-key="mode"><option value="hold"${n.mode === 'hold' ? ' selected' : ''}>Hold</option><option value="scrub"${n.mode === 'scrub' ? ' selected' : ''}>Scrub</option></select>`);
       html += field('Tick', num('tick', n.tick, 0.01, 0.05, 1));
     }
-    html += field('Link', n.link !== undefined ? `<div class="row"><span>${n.link}</span><button type="button" data-act="unlink">Unlink</button></div>` : '<span class="muted">none</span>');
+    html += field('Link', n.link !== undefined ? `<div class="row"><span>${escapeHtml(n.link)}</span><button type="button" data-act="unlink">Unlink</button></div>` : '<span class="muted">none</span>');
     html += '</div><div class="row" style="margin-top:8px"><button type="button" data-act="delete">Delete</button></div>';
     el.innerHTML = html;
   }
@@ -104,7 +106,6 @@
       + `${r.errors.length ? `<span class="bad">${r.errors.length} error${r.errors.length > 1 ? 's' : ''}</span>` : '<span class="ok">Valid</span>'} · ${r.warnings.length} warning${r.warnings.length === 1 ? '' : 's'}<br>Auto play ${score}`;
     $('issues').innerHTML = list.map((w, i) => `<button type="button" class="issue ${w.level}" data-issue="${i}">${escapeHtml(w.message)}</button>`).join('');
   }
-  const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   function focusIssue(i) {
     const w = [...report.errors, ...report.warnings][i];
@@ -340,7 +341,7 @@
     if (!report.ok) { toast('Fix the errors first'); return; }
     const from = Math.max(0, playhead - 2);
     if (!store.set(TEST_KEY, { song: songId, chart: doc.toJSON(), from })) { toast('Browser storage is not available'); return; }
-    window.open(`index.html?chart=editor`, '_blank');
+    window.open(`${GAME_PAGE}?chart=editor`, '_blank');
   });
   $('tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTool(b.dataset.tool); });
   $('props').addEventListener('change', onPropChange);
@@ -353,7 +354,8 @@
   $('meta-duration').addEventListener('change', e => { const v = Number(e.target.value); if (v > 0) { doc.chart.duration = v; changed(); } else renderMeta(); });
   $('song').addEventListener('change', () => { songId = $('song').value; Song.select(songId); stop(); });
 
-  $('song').innerHTML = Song.songs.map(id => `<option value="${id}">${Song.info(id).title}</option>`).join('');
+  $('song').innerHTML = Song.songs.map(id => `<option value="${id}">${escapeHtml(Song.info(id).title)}</option>`).join('');
+  document.addEventListener('click', e => { const b = e.target.closest('button'); if (b) b.blur(); });
   const resize = () => { view.resize(); dirty = true; };
   window.addEventListener('resize', resize);
   resize();
