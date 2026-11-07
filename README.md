@@ -73,6 +73,8 @@ Holds and Slides are judged at the start like a tap, then at a checkpoint every 
 
 The score goes up to 1,000,000. The result screen shows accuracy, max combo and the grade counts for each layer.
 
+The full rule set, including conflict rules and every note type, is in [Judgement and Scoring](docs/JudgementAndScoring.md). All timing values live in one file, `src/judgement-config.js`.
+
 ### Settings
 
 - **Scroll speed** from 1.0 to 20.0, set separately for the upper and lower layers, or locked together.
@@ -86,6 +88,7 @@ The score goes up to 1,000,000. The result screen shows accuracy, max combo and 
 ```
 play/index.html    the playable page
 src/               the same page as separate files, plus tests
+docs/              rule documents and test reports
 media/             images for this README
 ```
 
@@ -98,12 +101,15 @@ python src/build.py
 To run the tests (Node.js 18 or later):
 
 ```
+node src/tests/judgement-rules.test.js
 node src/tests/trackless-core.test.js
 node src/tests/song.test.js
 node src/tests/projection.test.js
 node src/tests/trackless-touch.test.js
 node src/tests/trackless-audio.test.js
 ```
+
+`node src/tests/judgement-rules.test.js --report` also rewrites [docs/BoundaryTestReport.md](docs/BoundaryTestReport.md).
 
 ## Music
 

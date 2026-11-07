@@ -70,9 +70,9 @@
   let ctx = null, master = null, startAt = 0, judge = null, chart = null, events = null, evIdx = 0, running = false;
   const flashes = [], pops = [];
   let lastGrade = null, lastGradeAt = 0;
-  const outLatency = () => Math.max(0, Math.min(0.3, (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0));
+  const outLatency = () => Math.max(0, Math.min(KiyoameJudgementConfig.input.maxOutputLatency, (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0));
   const songTime = () => (ctx ? ctx.currentTime - outLatency() - startAt : 0);
-  const JUDGE_LAG = 0.05;
+  const JUDGE_LAG = KiyoameJudgementConfig.input.judgeLag;
 
   const Song = window.KiyoameSong;
   const CHART_KEY = 'kiyoame.chart', SONG_KEY = 'kiyoame.song';
@@ -163,7 +163,7 @@
 
   const down = new Map();
 
-  const EDGE = 18, PALM = 70;
+  const EDGE = KiyoameJudgementConfig.input.edgePx, PALM = KiyoameJudgementConfig.input.palmPx;
 
   const TOUCH_KEY = 'kiyoame.trackless.touch';
   let touchZone = 'half';
