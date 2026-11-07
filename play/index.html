@@ -56,6 +56,15 @@
   #r-acc { text-align:center; }
   table { border-collapse:collapse; font-size:13px; width:100%; background:var(--glass); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
   td { padding:7px 14px; border-top:1px solid var(--line); color:var(--ink); } tr:first-child td { border-top:0; } td:last-child { text-align:right; color:var(--muted); }
+  .result { width:min(880px,100%); margin:auto; display:grid; grid-template-columns:minmax(0,340px) minmax(0,1fr); gap:28px; align-items:center; }
+  .result .r-main { margin:0; width:auto; }
+  .r-analysis { display:grid; gap:6px; min-width:0; }
+  .r-analysis h3 { margin:8px 0 0; } .r-analysis h3:first-child { margin-top:0; }
+  .r-chart { position:static; display:block; width:100%; height:96px; touch-action:auto; }
+  .r-chart.r-short { height:62px; }
+  #r-types td { padding:5px 12px; } #r-types td:nth-child(2) { color:var(--muted); font-size:12px; } #r-types .head td { font-size:10px; letter-spacing:.12em; color:var(--muted); }
+  #r-insights { margin:0; padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink); }
+  @media (max-width:640px) { .result { grid-template-columns:1fr; } }
 </style>
 <canvas id="c"></canvas>
 <div class="panel" id="home">
@@ -95,12 +104,25 @@
   </div>
 </div>
 <div class="panel" id="result" hidden>
-  <div class="card">
-    <h1 id="r-score"></h1>
-    <h2 id="r-acc"></h2>
-    <table id="r-table"></table>
-    <button id="again" type="button">Retry</button>
-    <button id="result-home" type="button" class="ghost">Back</button>
+  <div class="result">
+    <div class="card r-main">
+      <h1 id="r-score"></h1>
+      <h2 id="r-acc"></h2>
+      <table id="r-table"></table>
+      <button id="again" type="button">Retry</button>
+      <button id="result-home" type="button" class="ghost">Back</button>
+    </div>
+    <div class="r-analysis">
+      <h3>TIMING</h3>
+      <canvas id="r-hist" class="r-chart" aria-label="Timing histogram"></canvas>
+      <p id="r-timing"></p>
+      <h3>ACROSS THE SONG</h3>
+      <canvas id="r-timeline" class="r-chart r-short" aria-label="Accuracy across the song"></canvas>
+      <h3>BY NOTE TYPE</h3>
+      <table id="r-types"></table>
+      <h3>NOTES</h3>
+      <ul id="r-insights"></ul>
+    </div>
   </div>
 </div>
 <div class="panel" id="rotate" hidden><div class="card"><h1>Rotate to landscape</h1></div></div>
@@ -606,6 +628,186 @@
   const api = { CONFIG: C, ticksOf, checksOf, checkInterval, smears, isEx, baseOf, CELLS, MIN_WIDTH, DEFAULTS, WEIGHTS, TYPES, LAYERS, LAYER_HINT, slotCount, validateChart, peakContacts, lint, rangeAt, gradeFor, Judge, autoplayEvents, play };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KiyoameTrackless = api;
+})(typeof window === 'object' ? window : globalThis);
+
+</script>
+<script>
+(function (root) {
+  'use strict';
+
+  const T = typeof module === 'object' && module.exports ? require('./trackless-core.js') : root.KiyoameTrackless;
+  const GRADES = ['PERFECT', 'GREAT', 'GOOD', 'MISS'];
+  const BASES = ['Tap', 'Hold', 'Slide', 'Flow', 'Drag'];
+  const zero = () => ({ PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 });
+  const total = c => GRADES.reduce((s, g) => s + c[g], 0);
+  const accuracy = c => { const n = total(c); return n ? GRADES.reduce((s, g) => s + c[g] * T.WEIGHTS[g], 0) / n : null; };
+
+  function partTime(n, part, bpm) {
+    if (part === 'head') return n.time;
+    const i = Number(part.replace(/\D+/g, ''));
+    if (part.startsWith('check')) return T.checksOf(n, bpm)[i];
+    if (part.startsWith('tick')) return T.ticksOf(n)[i];
+    return n.time;
+  }
+
+  function sectionsOf(chart) {
+    const beat = 60 / chart.bpm, list = (chart.sections || []).slice().sort((a, b) => a.bar - b.bar);
+    return list.map((s, i) => ({ name: s.name, start: s.bar * 4 * beat, end: i + 1 < list.length ? list[i + 1].bar * 4 * beat : chart.duration }));
+  }
+
+  function analyse(results, chart, options) {
+    const o = Object.assign({ binMs: 10, rangeMs: 100, timelineBins: 32 }, options || {});
+    const p = T.DEFAULTS, byId = new Map(chart.notes.map(n => [n.id, n]));
+    const rows = results.map(r => {
+      const n = byId.get(r.noteId);
+      return Object.assign({}, r, { base: T.baseOf({ type: r.type }), at: n ? partTime(n, r.part, chart.bpm) : r.time, kind: r.part === 'head' ? 'head' : r.part.startsWith('check') ? 'checkpoint' : 'tick' });
+    });
+
+    const dts = rows.filter(r => r.kind === 'head' && r.base !== 'Drag' && r.dt !== null && r.grade !== 'MISS').map(r => r.dt * 1000);
+    const nBins = Math.round(2 * o.rangeMs / o.binMs), bins = Array.from({ length: nBins }, (_, i) => ({ from: -o.rangeMs + i * o.binMs, to: -o.rangeMs + (i + 1) * o.binMs, count: 0 }));
+    for (const d of dts) bins[Math.max(0, Math.min(nBins - 1, Math.floor((d + o.rangeMs) / o.binMs)))].count++;
+    const mean = dts.length ? dts.reduce((s, d) => s + d, 0) / dts.length : 0;
+    const sd = dts.length > 1 ? Math.sqrt(dts.reduce((s, d) => s + (d - mean) ** 2, 0) / (dts.length - 1)) : 0;
+    const sorted = dts.slice().sort((a, b) => a - b);
+    const timing = {
+      count: dts.length, mean, sd,
+      median: sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0,
+      fast: dts.filter(d => d < -p.perfect * 1000 - 1e-6).length,
+      slow: dts.filter(d => d > p.perfect * 1000 + 1e-6).length,
+      bins,
+    };
+
+    const byType = BASES.map(base => {
+      const heads = zero(), body = zero(), ex = zero();
+      for (const r of rows) if (r.base === base) { (r.kind === 'head' ? heads : body)[r.grade]++; if (r.type !== base) ex[r.grade]++; }
+      return { type: base, heads, body, all: GRADES.reduce((c, g) => (c[g] = heads[g] + body[g], c), zero()) };
+    }).filter(t => total(t.all));
+    for (const t of byType) { t.accuracy = accuracy(t.all); t.count = total(t.all); }
+
+    const byLayer = { upper: zero(), lower: zero() };
+    for (const r of rows) byLayer[r.layer][r.grade]++;
+
+    const sections = sectionsOf(chart).map(s => {
+      const c = zero();
+      for (const r of rows) if (r.at >= s.start - 1e-6 && r.at < s.end - 1e-6) c[r.grade]++;
+      return Object.assign(s, { counts: c, slots: total(c), accuracy: accuracy(c) });
+    }).filter(s => s.slots);
+
+    const span = chart.duration / o.timelineBins;
+    const timeline = Array.from({ length: o.timelineBins }, (_, i) => ({ t0: i * span, t1: (i + 1) * span, counts: zero() }));
+    for (const r of rows) timeline[Math.max(0, Math.min(o.timelineBins - 1, Math.floor(r.at / span)))].counts[r.grade]++;
+    for (const b of timeline) { b.slots = total(b.counts); b.accuracy = accuracy(b.counts); }
+
+    const misses = rows.filter(r => r.grade === 'MISS').map(r => ({ noteId: r.noteId, type: r.type, layer: r.layer, kind: r.kind, at: r.at }));
+
+    return { timing, byType, byLayer, sections, timeline, misses, insights: insights({ timing, byType, byLayer, sections, misses }) };
+  }
+
+  function insights(a) {
+    const out = [];
+    if (a.timing.count >= 20 && Math.abs(a.timing.mean) >= 10) out.push(`Hits land ${Math.round(Math.abs(a.timing.mean))} ms ${a.timing.mean > 0 ? 'late' : 'early'} on average.`);
+    if (a.timing.count >= 20 && a.timing.fast + a.timing.slow > 0) {
+      const f = a.timing.fast, s = a.timing.slow;
+      if (f >= 2 * s && f >= 5) out.push(`Most non-PERFECT hits are early (${f} FAST, ${s} SLOW).`);
+      else if (s >= 2 * f && s >= 5) out.push(`Most non-PERFECT hits are late (${s} SLOW, ${f} FAST).`);
+    }
+    if (a.misses.length) {
+      const groups = new Map();
+      for (const m of a.misses) { const key = `${T.baseOf(m)} ${m.kind === 'head' ? 'notes' : m.kind === 'checkpoint' ? 'checkpoints' : 'ticks'}`; groups.set(key, (groups.get(key) || 0) + 1); }
+      const [key, n] = [...groups].sort((x, y) => y[1] - x[1])[0];
+      if (n >= 3 && n >= a.misses.length * 0.4) out.push(`${Math.round(n / a.misses.length * 100)}% of misses are ${key} (${n}).`);
+    }
+    if (a.sections.length >= 2) {
+      const ranked = a.sections.filter(s => s.slots >= 10).sort((x, y) => x.accuracy - y.accuracy);
+      if (ranked.length >= 2 && ranked[ranked.length - 1].accuracy - ranked[0].accuracy >= 0.05) out.push(`Weakest section: ${ranked[0].name} (${(ranked[0].accuracy * 100).toFixed(1)}%).`);
+    }
+    const up = accuracy(a.byLayer.upper), low = accuracy(a.byLayer.lower);
+    if (up !== null && low !== null && Math.abs(up - low) >= 0.05) out.push(`The ${up < low ? 'upper' : 'lower'} layer is weaker: ${(Math.min(up, low) * 100).toFixed(1)}% against ${(Math.max(up, low) * 100).toFixed(1)}%.`);
+    return out.slice(0, 3);
+  }
+
+  const api = { analyse, accuracy, total, sectionsOf, partTime };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.KiyoameResultAnalysis = api;
+})(typeof window === 'object' ? window : globalThis);
+
+</script>
+<script>
+(function (root) {
+  'use strict';
+
+  const C = { ink: '#2a2f52', muted: '#6a7196', line: 'rgba(42,47,82,0.14)', zone: 'rgba(42,47,82,0.06)', early: '#4fbdb6', late: '#e7799f', perfect: '#5a63a6', miss: '#d9536a', mean: '#e8a53a' };
+  const FONT = '500 10px Montserrat, system-ui, sans-serif';
+
+  function setup(canvas) {
+    const dpr = Math.min(2, root.devicePixelRatio || 1), r = canvas.getBoundingClientRect();
+    const w = Math.max(10, r.width), h = Math.max(10, r.height);
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const g = canvas.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    return { g, w, h };
+  }
+
+  function drawHistogram(canvas, timing, perfectMs) {
+    const { g, w, h } = setup(canvas), pad = 14, base = h - pad, top = 6;
+    const bins = timing.bins, lo = bins[0].from, hi = bins[bins.length - 1].to;
+    const xOf = ms => (ms - lo) / (hi - lo) * w;
+    g.fillStyle = C.zone; g.fillRect(xOf(-perfectMs), top, xOf(perfectMs) - xOf(-perfectMs), base - top);
+    const max = Math.max(1, ...bins.map(b => b.count));
+    for (const b of bins) {
+      if (!b.count) continue;
+      const mid = (b.from + b.to) / 2, bh = (base - top) * b.count / max;
+      g.fillStyle = Math.abs(mid) <= perfectMs ? C.perfect : mid < 0 ? C.early : C.late;
+      g.fillRect(xOf(b.from) + 1, base - bh, xOf(b.to) - xOf(b.from) - 2, bh);
+    }
+    g.fillStyle = C.line; g.fillRect(0, base, w, 1); g.fillRect(xOf(0), top, 1, base - top);
+    if (timing.count) { g.fillStyle = C.mean; g.fillRect(Math.round(xOf(Math.max(lo, Math.min(hi, timing.mean)))) - 1, top, 2, base - top); }
+    g.fillStyle = C.muted; g.font = FONT;
+    g.textAlign = 'left'; g.fillText(`${lo} ms`, 0, h - 2);
+    g.textAlign = 'center'; g.fillText('0', xOf(0), h - 2);
+    g.textAlign = 'right'; g.fillText(`+${hi} ms`, w, h - 2);
+  }
+
+  function drawTimeline(canvas, analysis, duration) {
+    const { g, w, h } = setup(canvas), labels = 12, base = h - 8, top = labels + 2;
+    const xOf = t => t / duration * w;
+    for (const b of analysis.timeline) {
+      if (!b.slots) continue;
+      const bh = (base - top) * Math.max(0.04, (b.accuracy - 0.5) / 0.5);
+      g.fillStyle = b.counts.MISS ? C.late : C.perfect;
+      g.globalAlpha = b.counts.MISS ? 0.9 : 0.55;
+      g.fillRect(xOf(b.t0) + 1, base - Math.max(1, bh), xOf(b.t1) - xOf(b.t0) - 2, Math.max(1, bh));
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = C.line; g.fillRect(0, base, w, 1);
+    g.fillStyle = C.miss;
+    for (const m of analysis.misses) g.fillRect(Math.round(xOf(m.at)), base + 2, 1, 5);
+    g.font = FONT; g.textAlign = 'left';
+    let lastEnd = -Infinity;
+    for (const s of analysis.sections) {
+      const x = xOf(s.start);
+      g.fillStyle = C.line; g.fillRect(Math.round(x), top - 2, 1, base - top + 2);
+      const label = s.name.toUpperCase();
+      if (x < lastEnd + 6) continue;
+      g.fillStyle = C.muted; g.fillText(label, x + 3, labels - 2);
+      lastEnd = x + 3 + g.measureText(label).width;
+    }
+  }
+
+  const pct = v => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
+  const sign = v => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v))}`;
+
+  function render(doc, analysis, chart, perfectMs) {
+    const $ = id => doc.getElementById(id), t = analysis.timing;
+    $('r-timing').textContent = t.count
+      ? `Average ${sign(t.mean)} ms (${Math.abs(t.mean) < 5 ? 'centred' : t.mean > 0 ? 'late' : 'early'}) · spread ±${Math.round(t.sd)} ms · FAST ${t.fast} · SLOW ${t.slow}`
+      : 'No timed hits.';
+    $('r-types').innerHTML = '<tr class="head"><td>Type</td><td>PERFECT · GREAT · GOOD · MISS</td><td>Accuracy</td></tr>' + analysis.byType.map(x => `<tr><td>${x.type}</td><td>${x.all.PERFECT} · ${x.all.GREAT} · ${x.all.GOOD} · ${x.all.MISS}</td><td>${pct(x.accuracy)}</td></tr>`).join('');
+    $('r-insights').innerHTML = (analysis.insights.length ? analysis.insights : ['Nothing stands out: timing and sections are even.']).map(s => `<li>${s}</li>`).join('');
+    drawHistogram($('r-hist'), t, perfectMs);
+    drawTimeline($('r-timeline'), analysis, chart.duration);
+  }
+
+  root.KiyoameResultView = { render, drawHistogram, drawTimeline };
 })(typeof window === 'object' ? window : globalThis);
 
 </script>
@@ -1214,6 +1416,8 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
     const row = (name, c) => `<tr><td>${name}</td><td>PERFECT ${c.PERFECT} · GREAT ${c.GREAT} · GOOD ${c.GOOD} · MISS ${c.MISS}</td></tr>`;
     $('r-table').innerHTML = row('Lower', byLayer.lower) + row('Upper', byLayer.upper) + row('Total', s.counts);
     showPanel('result');
+    const analysis = window.KiyoameResultAnalysis.analyse(judge.results, chart);
+    window.KiyoameResultView.render(document, analysis, chart, T.DEFAULTS.perfect * 1000);
     if (ctx) ctx.suspend();
   }
 

@@ -171,6 +171,8 @@
     const row = (name, c) => `<tr><td>${name}</td><td>PERFECT ${c.PERFECT} · GREAT ${c.GREAT} · GOOD ${c.GOOD} · MISS ${c.MISS}</td></tr>`;
     $('r-table').innerHTML = row('Lower', byLayer.lower) + row('Upper', byLayer.upper) + row('Total', s.counts);
     showPanel('result');
+    const analysis = window.KiyoameResultAnalysis.analyse(judge.results, chart);
+    window.KiyoameResultView.render(document, analysis, chart, T.DEFAULTS.perfect * 1000);
     if (ctx) ctx.suspend();
   }
 
