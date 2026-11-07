@@ -66,4 +66,12 @@ const press = (id, x, t) => [{ k: 'down', id, x, t }, { k: 'up', id, t: t + 0.02
   eq(a.insights, [], 'a perfect run has nothing to point out');
 }
 
+{
+  const c = chart([tap('a', 1), Object.assign(tap('b', 2, 12), { type: 'ExTap' })]);
+  const a = run(c, [...press('p', 1, 1.06), ...press('q', 13, 2.09)]);
+  eq(a.timing.count, 1, 'Ex notes are always PERFECT and stay out of the timing data');
+  eq(a.timing.slow, 1, 'only the plain Tap counts as SLOW');
+  eq(a.byType.find(t => t.type === 'Tap').all.PERFECT, 1, 'the Ex hit still counts in its type');
+}
+
 console.log(`PASS: ${checks} result analysis checks`);
