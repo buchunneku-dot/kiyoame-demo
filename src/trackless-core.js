@@ -3,17 +3,20 @@
 
   const CELLS = 24;
   const MIN_WIDTH = 1;
+  const C = typeof module === 'object' && module.exports ? require('./judgement-config.js') : root.KiyoameJudgementConfig;
   const DEFAULTS = Object.freeze({
-    perfect: 0.040, great: 0.070, good: 0.100,
-    checkPerfect: 0.050, checkGreat: 0.100, checkGood: 0.150,
-    reach: 1,
-    dragWindow: 0.150,
-
-    flowTolerance: 0.040,
-    flowScrubFraction: 0.5,
-    maxContacts: 2,
+    perfect: C.tap.perfect, great: C.tap.great, good: C.tap.good,
+    exWindow: C.ex.window,
+    checkPerfect: C.checkpoint.perfect, checkGreat: C.checkpoint.great, checkGood: C.checkpoint.good,
+    checkLeadIn: C.checkpoint.leadIn,
+    reach: C.position.reach,
+    dragWindow: C.drag.window,
+    flowTolerance: C.flow.tolerance, flowExToleranceScale: C.flow.exToleranceScale,
+    flowScrubFraction: C.flow.scrubFraction, flowExScrubScale: C.flow.exScrubScale,
+    flowActiveMargin: C.flow.activeMargin,
+    maxContacts: C.chart.maxContacts, tapContact: C.chart.tapContact,
   });
-  const WEIGHTS = Object.freeze({ PERFECT: 1, GREAT: 0.7, GOOD: 0.4, MISS: 0 });
+  const WEIGHTS = C.weights;
   const GRADE_RANK = Object.freeze({ PERFECT: 0, GREAT: 1, GOOD: 2, MISS: 3 });
   const TYPES = Object.freeze(['Tap', 'Hold', 'Slide', 'Drag', 'ExTap', 'ExHold', 'ExSlide', 'Flow', 'ExFlow']);
   const LAYERS = Object.freeze(['upper', 'lower']);
@@ -30,7 +33,7 @@
     for (let i = 1; n.time + i * n.tick <= n.end + 1e-9; i++) out.push(n.time + i * n.tick);
     return out;
   }
-  function checkInterval(bpm) { const beat = 60 / bpm; return bpm < 120 ? beat / 4 : bpm < 240 ? beat / 2 : beat; }
+  function checkInterval(bpm) { const beat = 60 / bpm; return bpm < C.checkpoint.sixteenthBelowBpm ? beat / 4 : bpm < C.checkpoint.quarterFromBpm ? beat / 2 : beat; }
   function checksOf(n, bpm) {
     const iv = checkInterval(bpm || 120), out = [];
     for (let k = 1; n.time + k * iv < n.end - 1e-6; k++) out.push(n.time + k * iv);
@@ -60,7 +63,7 @@
       if (n.x < 0 || n.x + n.width > CELLS) throw new Error(`${n.id}: range is outside the field`);
       if (baseOf(n) === 'Flow') {
         if (n.mode !== 'hold' && n.mode !== 'scrub') throw new Error(`${n.id}: Flow mode must be hold or scrub`);
-        if (!finite(n.tick) || n.tick < 0.05 || n.tick > 1) throw new Error(`${n.id}: Flow tick must be between 0.05 and 1 s`);
+        if (!finite(n.tick) || n.tick < C.flow.minTick || n.tick > C.flow.maxTick) throw new Error(`${n.id}: Flow tick must be between ${C.flow.minTick} and ${C.flow.maxTick} s`);
         if (n.end - n.time < n.tick - 1e-9) throw new Error(`${n.id}: Flow needs at least one tick`);
       } else if (n.mode !== undefined || n.tick !== undefined) throw new Error(`${n.id}: only Flow notes have mode / tick`);
       if (baseOf(n) === 'Slide') {
@@ -89,13 +92,14 @@
     return chart;
   }
 
-  function peakContacts(chart) {
+  function peakContacts(chart, params) {
+    const w = Object.assign({}, DEFAULTS, params || {}).tapContact;
     const ev = [];
     for (const n of chart.notes) {
       if (n.type === 'Drag') continue;
       const long = baseOf(n) === 'Hold' || baseOf(n) === 'Slide' || baseOf(n) === 'Flow';
-      const a = long ? n.time : n.time - 0.05;
-      const b = long ? n.end : n.time + 0.05;
+      const a = long ? n.time : n.time - w;
+      const b = long ? n.end : n.time + w;
       ev.push([a, 1], [b, -1]);
     }
     ev.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
@@ -122,7 +126,7 @@
     }
     const s = strokeOf(a, p);
     if (!s || a === b || b.type === 'Drag') return false;
-    const headStart = b.time - (isEx(b) ? p.good : p.great), headEnd = b.time + p.good;
+    const headStart = b.time - (isEx(b) ? p.exWindow : p.great), headEnd = b.time + (isEx(b) ? p.exWindow : p.good);
     if (headEnd < s.t0 || headStart > s.t1) return false;
     return b.x < s.r && s.l < b.x + b.width;
   }
@@ -130,7 +134,7 @@
   function lint(chart, params) {
     const p = Object.assign({}, DEFAULTS, params || {});
     const warnings = [];
-    const peak = peakContacts(chart);
+    const peak = peakContacts(chart, p);
     if (peak > p.maxContacts) warnings.push(`needs ${peak} contacts at once, over the limit of ${p.maxContacts}`);
     for (const a of chart.notes) {
       if (!strokeOf(a, p) && a.type !== 'Drag') continue;
@@ -178,7 +182,7 @@
       validateChart(chart);
       this.p = Object.assign({}, DEFAULTS, params || {});
       const p = this.p;
-      if (![p.perfect, p.great, p.good, p.checkPerfect, p.checkGreat, p.checkGood].every(n => finite(n) && n > 0) || p.perfect > p.great || p.great > p.good || p.checkPerfect > p.checkGreat || p.checkGreat > p.checkGood) throw new Error('Invalid judgement windows');
+      if (![p.perfect, p.great, p.good, p.checkPerfect, p.checkGreat, p.checkGood, p.exWindow].every(n => finite(n) && n > 0) || p.perfect > p.great || p.great > p.good || p.checkPerfect > p.checkGreat || p.checkGreat > p.checkGood) throw new Error('Invalid judgement windows');
       this.chart = chart;
       this.notes = chart.notes.map(n => Object.assign({}, n, { head: null, tail: null, broken: false }));
       this.contacts = new Map();
@@ -223,7 +227,7 @@
     protectWindows() {
       const p = this.p;
       const heads = this.notes.filter(n => n.type !== 'Drag');
-      for (const n of heads) { n.early = isEx(n) ? p.good : p.great; n.late = p.good; }
+      for (const n of heads) { n.early = isEx(n) ? p.exWindow : p.great; n.late = isEx(n) ? p.exWindow : p.good; }
       const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width;
       for (let i = 0; i < heads.length; i++) {
         const n = heads[i];
@@ -244,7 +248,7 @@
       if (x1 !== x0) {
         const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
         for (const n of this.flows) {
-          if (n.mode !== 'scrub' || t1 < n.time - 0.1 || t1 > n.end + 0.1) continue;
+          if (n.mode !== 'scrub' || t1 < n.time - p.flowActiveMargin || t1 > n.end + p.flowActiveMargin) continue;
           const len = Math.min(hi, n.x + n.width) - Math.max(lo, n.x);
           if (len > 0) n.moves.push([t1, len]);
         }
@@ -334,7 +338,7 @@
       }
 
       for (const n of this.flows) {
-        if (n.mode !== 'hold' || now <= prev || now < n.time - 0.1 || prev > n.end + 0.1) continue;
+        if (n.mode !== 'hold' || now <= prev || now < n.time - p.flowActiveMargin || prev > n.end + p.flowActiveMargin) continue;
         if (this.anyInside({ x: n.x, width: n.width })) {
           const last = n.pres[n.pres.length - 1];
           if (last && prev <= last[1] + 1e-9) last[1] = now; else n.pres.push([prev, now]);
@@ -361,19 +365,19 @@
           const grade = gap <= p.checkPerfect + 1e-9 ? 'PERFECT' : gap <= p.checkGreat + 1e-9 ? 'GREAT' : gap <= p.checkGood + 1e-9 ? 'GOOD' : 'MISS';
           this.record(n, 'check' + i, grade, null, grade === 'MISS' ? 'lost' : '');
         }
-        if (now > prev && at > n.time - 0.05 && this.anyInside(rangeAt(n, at))) n.lastIn = at;
+        if (now > prev && at > n.time - p.checkLeadIn && this.anyInside(rangeAt(n, at))) n.lastIn = at;
         if (n.nextCheck >= n.checks.length && now >= n.end) n.tail = 'DONE';
       }
     }
 
     evalTicks(n, now) {
-      const p = this.p, ex = isEx(n), tol = p.flowTolerance * (ex ? 2 : 1);
+      const p = this.p, ex = isEx(n), tol = p.flowTolerance * (ex ? p.flowExToleranceScale : 1);
       while (n.nextTick < n.tickTimes.length && now >= n.tickTimes[n.nextTick] + tol - 1e-9) {
         const i = n.nextTick++, ti = n.tickTimes[i];
         let ok;
         if (n.mode === 'hold') ok = n.pres.some(([a, b]) => b >= ti - tol - 1e-9 && a <= ti + tol + 1e-9);
         else {
-          const need = Math.max(1, p.flowScrubFraction * n.width * (ex ? 0.5 : 1));
+          const need = Math.max(1, p.flowScrubFraction * n.width * (ex ? p.flowExScrubScale : 1));
           ok = n.moves.reduce((sum, [t, len]) => (t > ti - n.tick - 1e-9 && t <= ti + tol + 1e-9 ? sum + len : sum), 0) >= need - 1e-9;
         }
         n.tickRes[i] = ok ? 'PERFECT' : 'MISS';
@@ -436,7 +440,7 @@
     return judge.finish();
   }
 
-  const api = { ticksOf, checksOf, checkInterval, smears, isEx, baseOf, CELLS, MIN_WIDTH, DEFAULTS, WEIGHTS, TYPES, LAYERS, LAYER_HINT, slotCount, validateChart, peakContacts, lint, rangeAt, gradeFor, Judge, autoplayEvents, play };
+  const api = { CONFIG: C, ticksOf, checksOf, checkInterval, smears, isEx, baseOf, CELLS, MIN_WIDTH, DEFAULTS, WEIGHTS, TYPES, LAYERS, LAYER_HINT, slotCount, validateChart, peakContacts, lint, rangeAt, gradeFor, Judge, autoplayEvents, play };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KiyoameTrackless = api;
 })(typeof window === 'object' ? window : globalThis);
