@@ -75,9 +75,10 @@
   const JUDGE_LAG = 0.05;
 
   const Song = window.KiyoameSong;
-  const CHART_KEY = 'kiyoame.chart';
+  const CHART_KEY = 'kiyoame.chart', SONG_KEY = 'kiyoame.song';
   let chartName = 'standard';
   try { if (Song.charts.includes(localStorage.getItem(CHART_KEY))) chartName = localStorage.getItem(CHART_KEY); } catch (e) {}
+  try { if (Song.songs.includes(localStorage.getItem(SONG_KEY))) Song.select(localStorage.getItem(SONG_KEY)); } catch (e) {}
   const goButtons = () => [...document.querySelectorAll('.go'), $('again')];
   let starting = false, lastClock = 0, lastClockAt = 0;
   const canFullscreen = () => !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
@@ -473,9 +474,29 @@
   $('settings-back').addEventListener('click', () => showPanel('home'));
   $('result-home').addEventListener('click', () => showPanel('home'));
   {
-    const info = Song.buildChart(chartName);
-    $('song-title').textContent = info.title;
-    $('song-meta').textContent = `${info.bpm} BPM`;
+    const length = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    const list = $('song-list');
+    for (const id of Song.songs) {
+      const info = Song.info(id), b = document.createElement('button');
+      b.type = 'button'; b.dataset.song = id;
+      const name = document.createElement('span'), meta = document.createElement('span');
+      name.className = 'name'; name.textContent = info.title;
+      meta.className = 'meta'; meta.textContent = `${info.bpm} BPM · ${length(info.duration)}`;
+      b.append(name, meta); list.append(b);
+    }
+    const showSong = () => {
+      const info = Song.info(Song.selected);
+      $('song-title').textContent = info.title;
+      $('song-meta').textContent = `${info.bpm} BPM · ${length(info.duration)}`;
+      for (const b of list.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.song === Song.selected));
+      for (const b of document.querySelectorAll('#chart-pick button')) b.querySelector('.count').textContent = `${info.counts[b.dataset.chart]} notes`;
+      $('start-status').textContent = '';
+    };
+    for (const b of list.querySelectorAll('button')) b.addEventListener('click', () => {
+      Song.select(b.dataset.song);
+      try { localStorage.setItem(SONG_KEY, b.dataset.song); } catch (e) {}
+      showSong();
+    });
     const pick = name => {
       chartName = name;
       try { localStorage.setItem(CHART_KEY, name); } catch (e) {}
@@ -483,6 +504,7 @@
     };
     for (const b of document.querySelectorAll('#chart-pick button')) b.addEventListener('click', () => pick(b.dataset.chart));
     pick(chartName);
+    showSong();
   }
   for (const b of document.querySelectorAll('.go')) b.addEventListener('click', startRun);
   $('again').addEventListener('click', startRun);

@@ -19,6 +19,8 @@ def main():
     head = '<!doctype html>\n<html lang="en">\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">\n'
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(head + page + '</html>\n', encoding='utf-8', newline='\n')
+    (OUT.parent / 'song').mkdir(exist_ok=True)
+    (OUT.parent / 'song' / 'ams.mp3').write_bytes((SRC / 'song' / 'ams.mp3').read_bytes())
     print(OUT, OUT.stat().st_size)
 
 

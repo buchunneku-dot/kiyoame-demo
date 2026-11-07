@@ -35,7 +35,16 @@
   .home { text-align:center; gap:14px; } .home .mark { font-size:11px; letter-spacing:.6em; color:var(--muted); margin:0 0 -6px; } #start-status { min-height:1.6em; text-align:center; } .home .title { font-size:36px; font-weight:300; letter-spacing:.2em; white-space:nowrap; color:var(--ink); } .home .hint { font-size:12px; letter-spacing:.04em; } .home h2 { font-weight:400; letter-spacing:.2em; }
   .home button { padding:16px; letter-spacing:.3em; background:rgba(255,255,255,.78); color:var(--ink); border:1px solid var(--line); box-shadow:0 6px 24px rgba(90,98,160,.12); } .home button.ghost { background:transparent; color:#4a5080; box-shadow:none; }
 
+  .select { width:min(780px,100%); margin:auto; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:28px; align-items:center; }
+  .songs { display:grid; gap:10px; align-content:center; } .songs .mark { text-align:left; margin:0; }
+  #song-list { display:grid; gap:8px; }
+  #song-list button { display:grid; gap:4px; text-align:left; padding:14px 16px; letter-spacing:.08em; background:rgba(255,255,255,.42); color:var(--ink); border:1px solid var(--line); box-shadow:none; }
+  #song-list button[aria-pressed="true"] { background:rgba(255,255,255,.86); border-color:rgba(42,47,82,.35); box-shadow:0 6px 24px rgba(90,98,160,.14); }
+  #song-list .name { font-size:17px; font-weight:400; letter-spacing:.12em; } #song-list .meta { font-size:12px; font-weight:400; color:var(--muted); letter-spacing:.06em; }
+  .select .home { width:auto; margin:0; } .select .home .title { font-size:28px; white-space:normal; }
+  @media (max-width:600px) { .select { grid-template-columns:1fr; gap:16px; } }
   #chart-pick { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:4px 0 2px; }
+  #chart-pick .count { display:block; margin-top:4px; font-size:11px; letter-spacing:.06em; color:var(--muted); }
   .home #chart-pick button { padding:10px; font-size:13px; letter-spacing:.18em; background:transparent; color:var(--muted); box-shadow:none; }
   .home #chart-pick button[aria-pressed="true"] { background:rgba(255,255,255,.78); color:var(--ink); border-color:rgba(42,47,82,.35); }
 
@@ -46,15 +55,21 @@
 </style>
 <canvas id="c"></canvas>
 <div class="panel" id="home">
-  <div class="card home">
+  <div class="select">
+  <div class="songs">
     <p class="mark">KIYOAME</p>
+    <h3>SELECT SONG</h3>
+    <div id="song-list" role="group" aria-label="Songs"></div>
+  </div>
+  <div class="card home">
     <h1 class="title" id="song-title"></h1>
     <h2 id="song-meta"></h2>
-    <div id="chart-pick" role="group" aria-label="Chart"><button type="button" data-chart="standard">Standard</button><button type="button" data-chart="showcase">Showcase</button></div>
+    <div id="chart-pick" role="group" aria-label="Chart"><button type="button" data-chart="standard">Standard<span class="count"></span></button><button type="button" data-chart="showcase">Showcase<span class="count"></span></button></div>
     <button class="go" type="button">Start</button>
     <button id="to-settings" type="button" class="ghost">Settings</button>
     <p id="start-status" role="status" aria-live="polite"></p>
     <p class="hint">Mouse or touch: press, hold and slide where the notes meet the line.</p>
+  </div>
   </div>
 </div>
 <div class="panel" id="settings" hidden>
@@ -91,6 +106,8 @@
 <script src="song/audio.js" data-build></script>
 <script src="song/chart-standard.js"></script>
 <script src="song/chart-showcase.js"></script>
+<script src="song/chart-ams-standard.js"></script>
+<script src="song/chart-ams-showcase.js"></script>
 <script src="song/song.js"></script>
 <script src="trackless-tap.js"></script>
 <script src="trackless-notes.js"></script>
