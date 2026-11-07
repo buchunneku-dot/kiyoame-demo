@@ -34,7 +34,7 @@ The judge answers three questions for every touch:
 
 Late beyond the window is a MISS, recorded when the window closes.
 
-**Why there is no early GOOD.** A wide early window lets a press meant for one note reach the next one. With the early limit at 70 ms, the next note is rarely taken early, and the cost is a small rise in honest misses for imprecise players (Section 9).
+**Why there is no early GOOD.** A wide early window lets a press meant for one note reach the next one. With the early limit at 70 ms, the next note is rarely taken early, and the cost is a small rise in honest misses for imprecise players (Section 10).
 
 ## 4. Rules by note type
 
