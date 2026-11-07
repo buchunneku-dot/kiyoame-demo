@@ -112,7 +112,7 @@
   const MIN_WIDTH = 1;
   const DEFAULTS = Object.freeze({
     perfect: 0.040, great: 0.070, good: 0.100,
-    releaseTolerance: 0.150,
+    checkPerfect: 0.050, checkGreat: 0.100, checkGood: 0.150,
     reach: 1,
     dragWindow: 0.150,
 
@@ -137,7 +137,14 @@
     for (let i = 1; n.time + i * n.tick <= n.end + 1e-9; i++) out.push(n.time + i * n.tick);
     return out;
   }
-  function slotCount(n) { const b = baseOf(n); return b === 'Hold' || b === 'Slide' ? 2 : b === 'Flow' ? 1 + ticksOf(n).length : 1; }
+  function checkInterval(bpm) { const beat = 60 / bpm; return bpm < 120 ? beat / 4 : bpm < 240 ? beat / 2 : beat; }
+  function checksOf(n, bpm) {
+    const iv = checkInterval(bpm || 120), out = [];
+    for (let k = 1; n.time + k * iv < n.end - 1e-6; k++) out.push(n.time + k * iv);
+    if (!out.length) out.push((n.time + n.end) / 2);
+    return out;
+  }
+  function slotCount(n, bpm) { const b = baseOf(n); return b === 'Hold' || b === 'Slide' ? 1 + checksOf(n, bpm).length : b === 'Flow' ? 1 + ticksOf(n).length : 1; }
   const endOf = n => (n.end === undefined ? n.time : n.end);
 
   function validateChart(chart) {
@@ -222,7 +229,7 @@
     }
     const s = strokeOf(a, p);
     if (!s || a === b || b.type === 'Drag') return false;
-    const headStart = b.time - p.great, headEnd = b.time + p.good;
+    const headStart = b.time - (isEx(b) ? p.good : p.great), headEnd = b.time + p.good;
     if (headEnd < s.t0 || headStart > s.t1) return false;
     return b.x < s.r && s.l < b.x + b.width;
   }
@@ -278,7 +285,7 @@
       validateChart(chart);
       this.p = Object.assign({}, DEFAULTS, params || {});
       const p = this.p;
-      if (![p.perfect, p.great, p.good, p.releaseTolerance].every(n => finite(n) && n > 0) || p.perfect > p.great || p.great > p.good) throw new Error('Invalid judgement windows');
+      if (![p.perfect, p.great, p.good, p.checkPerfect, p.checkGreat, p.checkGood].every(n => finite(n) && n > 0) || p.perfect > p.great || p.great > p.good || p.checkPerfect > p.checkGreat || p.checkGreat > p.checkGood) throw new Error('Invalid judgement windows');
       this.chart = chart;
       this.notes = chart.notes.map(n => Object.assign({}, n, { head: null, tail: null, broken: false }));
       this.contacts = new Map();
@@ -286,7 +293,8 @@
       this.time = -Infinity;
       this.combo = 0; this.maxCombo = 0; this.weight = 0;
       this.counts = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
-      this.slots = this.notes.reduce((s, n) => s + slotCount(n), 0);
+      this.slots = this.notes.reduce((s, n) => s + slotCount(n, chart.bpm), 0);
+      for (const n of this.notes) if (baseOf(n) === 'Hold' || baseOf(n) === 'Slide') { n.checks = checksOf(n, chart.bpm); n.nextCheck = 0; n.checks.forEach((_, i) => { n['check' + i] = null; }); }
       this.byId = new Map(this.notes.map(n => [n.id, n]));
       this.flows = this.notes.filter(n => baseOf(n) === 'Flow');
       for (const n of this.flows) { n.tickTimes = ticksOf(n); n.nextTick = 0; n.pres = []; n.moves = []; n.tickRes = []; }
@@ -322,7 +330,7 @@
     protectWindows() {
       const p = this.p;
       const heads = this.notes.filter(n => n.type !== 'Drag');
-      for (const n of heads) { n.early = p.great; n.late = p.good; }
+      for (const n of heads) { n.early = isEx(n) ? p.good : p.great; n.late = p.good; }
       const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width;
       for (let i = 0; i < heads.length; i++) {
         const n = heads[i];
@@ -452,14 +460,16 @@
         }
 
         if ((baseOf(n) !== 'Hold' && baseOf(n) !== 'Slide') || n.tail !== null) continue;
-        if (now > prev) {
-          const at = Math.min(now, n.end);
-          if (at > n.time - 0.05 && this.anyInside(rangeAt(n, at))) n.lastIn = at;
+        const at = Math.min(now, n.end);
+        while (n.nextCheck < n.checks.length && n.checks[n.nextCheck] <= now + 1e-9) {
+          const i = n.nextCheck++, tc = n.checks[i];
+          if (this.anyInside(rangeAt(n, tc))) n.lastIn = tc;
+          const gap = n.lastIn === undefined ? Infinity : tc - n.lastIn;
+          const grade = gap <= p.checkPerfect + 1e-9 ? 'PERFECT' : gap <= p.checkGreat + 1e-9 ? 'GREAT' : gap <= p.checkGood + 1e-9 ? 'GOOD' : 'MISS';
+          this.record(n, 'check' + i, grade, null, grade === 'MISS' ? 'lost' : '');
         }
-        if (now >= n.end) {
-          const ok = n.lastIn !== undefined && n.lastIn >= n.end - p.releaseTolerance * (isEx(n) ? 2 : 1) - 1e-9;
-          this.record(n, 'tail', ok ? 'PERFECT' : 'MISS', null, ok ? '' : 'lost');
-        }
+        if (now > prev && at > n.time - 0.05 && this.anyInside(rangeAt(n, at))) n.lastIn = at;
+        if (n.nextCheck >= n.checks.length && now >= n.end) n.tail = 'DONE';
       }
     }
 
@@ -533,7 +543,7 @@
     return judge.finish();
   }
 
-  const api = { ticksOf, smears, isEx, baseOf, CELLS, MIN_WIDTH, DEFAULTS, WEIGHTS, TYPES, LAYERS, LAYER_HINT, slotCount, validateChart, peakContacts, lint, rangeAt, gradeFor, Judge, autoplayEvents, play };
+  const api = { ticksOf, checksOf, checkInterval, smears, isEx, baseOf, CELLS, MIN_WIDTH, DEFAULTS, WEIGHTS, TYPES, LAYERS, LAYER_HINT, slotCount, validateChart, peakContacts, lint, rangeAt, gradeFor, Judge, autoplayEvents, play };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KiyoameTrackless = api;
 })(typeof window === 'object' ? window : globalThis);
@@ -1267,7 +1277,8 @@ window.KIYOAME_THEME_AUDIO = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAA
       if ((base === 'Tap' || n.type === 'Drag') && n.head !== null && !missed) continue;
 
       const fade = n.layer === 'lower' ? Math.max(0, Math.min(1, (D_MAX.lower - dOf(n.time)) / 1.2)) : 1;
-      const alpha = (missed ? 0.25 : 1) * fade;
+      const longHeld = (base === 'Hold' || base === 'Slide') && now >= n.time && holding(n);
+      const alpha = (missed && !longHeld ? 0.25 : 1) * fade;
       const skin = window.KiyoameTracklessNotes;
       if (n.type === 'Drag') {
         skin.drag(g, L, n.x, n.width, dOf(n.time), alpha);

@@ -84,41 +84,47 @@ eq(grade(0, 4).MISS, 1, 'two cells past the edge misses');
 }
 
 const hold = { id: 'h', type: 'Hold', layer: 'lower', time: 2, end: 4, x: 6, width: 3 };
+const parts = j => Object.fromEntries(j.results.map(r => [r.noteId + '.' + r.part, r.grade]));
 {
+  eq(T.checkInterval(120), 0.25, '120 BPM: a checkpoint every eighth note');
+  eq(T.checkInterval(100), 0.15, 'under 120 BPM: every sixteenth');
+  eq(T.checkInterval(240), 0.25, '240 BPM and over: every beat');
+  eq(T.checksOf(hold, 120).length, 7, 'a 2 s Hold at 120 BPM has 7 checkpoints (none on the end itself)');
+  eq(T.checksOf({ ...hold, end: 2.2 }, 120).length, 1, 'a Hold shorter than one interval still has one checkpoint');
   const s = run([hold], j => { j.down('p', 7, 2); j.up('p', 4.01); });
-  eq(s.counts.PERFECT, 2, 'held to the end: PERFECT head and tail');
-  eq(s.slots, 2, 'Hold takes two judgement slots');
+  eq(s.counts.PERFECT, 8, 'held to the end: head and 7 checkpoints PERFECT');
+  eq(s.slots, 8, 'Hold slots = head + checkpoints');
 }
 {
-  const s = run([hold], j => { j.down('p', 7, 2); j.move('p', 7, 3); j.up('p', 3.01); });
-  eq(s.counts.MISS, 1, 'releasing early misses the tail');
+  const s = run([hold], j => { j.down('p', 7, 2); j.up('p', 3.01); });
+  eq(s.counts.MISS, 3, 'let go at 3.01: the checkpoints at 3.25 and 3.5 are GOOD/MISS-graded by the gap, 3.75 and after are MISS');
+  const x = run([hold], j => { j.down('p', 7, 2); j.up('p', 3.74); });
+  eq(x.counts.PERFECT, 8, 'no release judgement: letting go just after the last checkpoint costs nothing');
 }
 {
-  const s = run([hold], j => { j.down('p', 7, 2); j.move('p', 20, 2.5); j.move('p', 7, 2.53); j.up('p', 4.01); });
-  eq(s.counts.PERFECT, 2, 'leaving the range briefly: head and tail PERFECT');
-
-  const t = run([hold], j => { j.down('p', 7, 2); j.move('p', 20, 2.5); j.move('p', 7, 2.7); j.up('p', 4.01); });
-  eq(t.counts.PERFECT, 2, 'gone for 200 ms then back: reconnects, tail PERFECT');
-  const u = run([hold], j => { j.down('p', 7, 2); j.up('p', 2.5); j.down('p', 8, 3.0); j.up('p', 4.01); });
-  eq(u.counts.PERFECT, 2, 'released and pressed again: reconnects, tail PERFECT');
-  const w = run([hold], j => { j.down('p', 7, 2); j.move('p', 20, 3.5); j.up('p', 4.01); });
-  eq(w.counts.MISS, 1, 'not in the range at the end: tail MISS');
-  const x = run([hold], j => { j.down('p', 7, 2); j.up('p', 3.95); });
-  eq(x.counts.PERFECT, 2, 'released 50 ms before the end (within 150 ms): counts as held');
+  const g = gapMs => { const j = new T.Judge(chart([hold])); j.down('p', 7, 2); j.up('p', 2.5 - gapMs / 1000); j.down('p', 7, 2.6); j.up('p', 4.01); j.finish(); return parts(j)['h.check1']; };
+  eq(g(30), 'PERFECT', 'checkpoint 50 ms window: let go 30 ms before it is still PERFECT');
+  eq(g(80), 'GREAT', 'let go 80 ms before: GREAT');
+  eq(g(130), 'GOOD', 'let go 130 ms before: GOOD');
+  eq(g(200), 'MISS', 'let go 200 ms before: MISS');
+  const t = run([hold], j => { j.down('p', 7, 2); j.move('p', 20, 2.5); j.move('p', 7, 2.53); j.up('p', 4.01); });
+  eq(t.counts.MISS, 0, 'leaving the range briefly between checkpoints costs nothing');
 }
 {
   const s = run([hold], j => {});
-  eq(s.counts.MISS, 2, 'head not pressed: tail is a MISS too');
+  eq(s.counts.MISS, 8, 'not touched at all: head and every checkpoint MISS');
 }
 {
-
   const s = run([hold], j => { j.down('p', 7, 2); j.down('q', 8, 3); j.up('p', 3.0); j.up('q', 4.01); });
-  eq(s.counts.PERFECT, 2, 'any finger inside a Hold keeps it held; switching or rubbing fingers does not break it');
-  const scrub = run([hold], j => { j.down('p', 20, 1); j.move('p', 7, 3); j.move('p', 20, 3.1); j.up('p', 4.1); });
-  eq(scrub.counts.MISS, 2, 'missed the head and left before the end: head and tail MISS');
-  const late = run([hold], j => { j.down('p', 20, 1); j.move('p', 7, 3); j.up('p', 4.01); });
-  eq(late.counts.MISS, 1, 'pressed late (head MISS)');
-  eq(late.counts.PERFECT, 1, 'but held to the end: tail PERFECT (the head counts once, then it can reconnect)');
+  eq(s.counts.PERFECT, 8, 'any finger inside a Hold keeps it held; switching or rubbing fingers does not break it');
+  const late = new T.Judge(chart([hold])); late.down('p', 20, 1); late.move('p', 7, 3); late.up('p', 4.01); late.finish();
+  const pl = parts(late);
+  eq(pl['h.head'], 'MISS', 'joined late: head MISS');
+  eq(pl['h.check3'] + pl['h.check4'] + pl['h.check6'], 'MISSPERFECTPERFECT', 'but the checkpoints after joining count: a missed head does not kill the body');
+  const early = new T.Judge(chart([hold])); early.down('p', 7, 1.85); early.up('p', 4.01); early.finish();
+  const pe = parts(early);
+  eq(pe['h.head'], 'MISS', 'pressed 150 ms early and held: head MISS (taps keep their early rule)');
+  eq(Object.values(pe).filter(g => g === 'PERFECT').length, 7, 'every checkpoint is PERFECT');
 }
 
 const slide = {
@@ -127,11 +133,11 @@ const slide = {
 };
 {
   const s = T.play(new T.Judge(chart([slide])), T.autoplayEvents(chart([slide])));
-  eq(s.counts.PERFECT, 2, 'following the path: head and tail PERFECT');
+  eq(s.counts.PERFECT, T.slotCount(slide, 120), 'following the path: head and every checkpoint PERFECT');
 }
 {
   const s = run([slide], j => { j.down('p', 1, 2); j.move('p', 1, 3); j.up('p', 4.01); });
-  eq(s.counts.MISS, 1, 'staying still off the path: tail MISS');
+  ok(s.counts.MISS >= 3, 'staying still off the path: the later checkpoints MISS');
   eq(T.rangeAt(slide, 3).x, 9, 'paths interpolate linearly in time');
 }
 
@@ -168,7 +174,7 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   j.down('hold', 10, 1.99);
   j.move('pass', 10, 2.0); j.move('pass', 2, 2.2);
   j.up('pass', 2.3); j.up('hold', 4.01);
-  eq(j.finish().counts.PERFECT, 2, 'after a passing finger leaves, the original finger still holds the Hold');
+  eq(j.finish().counts.MISS, 0, 'after a passing finger leaves, the original finger still holds the Hold');
 }
 
 {
@@ -292,7 +298,7 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   const hold = { id: 'h', type: 'Hold', layer: 'lower', time: 4, end: 6, x: 9, width: 3 };
   const j = new T.Judge(chart([hold, drag('d', 5)]));
   j.down('f', 10, 4); j.up('f', 6.01);
-  eq(j.finish().counts.PERFECT, 3, 'a finger holding a Hold also catches Drags in range (head, tail, Drag)');
+  eq(j.finish().counts.MISS, 0, 'a finger holding a Hold also catches Drags in range');
 
   const many = chart([{ id: 'a', type: 'Hold', layer: 'lower', time: 1, end: 5, x: 0, width: 3 }, { id: 'b', type: 'Hold', layer: 'lower', time: 1, end: 5, x: 6, width: 3 }, drag('d', 3, 12), drag('e', 3, 15)]);
   eq(T.lint(many).peakContacts, 2, 'Drags need no extra contact');
@@ -326,7 +332,7 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
   k.finish();
   const gk = Object.fromEntries(k.results.map(x => [x.noteId + x.part, x.grade]));
   eq(gk.nhead, 'PERFECT', 'a finger leaving a Hold is free to hit the next note');
-  eq(gk.htail, 'MISS', 'no finger in the Hold at the end: tail MISS');
+  eq(gk[`hcheck${T.checksOf(hold, 120).length - 1}`], 'MISS', 'no finger in the Hold at the end: last checkpoint MISS');
 }
 
 {
@@ -339,21 +345,15 @@ ok(!T.TYPES.includes('Rest'), 'Rest is not in the type list');
     return j.finish().counts;
   };
   eq(run1('Hold', 0.09, 0).GOOD, 1, 'control: a plain Hold 90 ms late has a GOOD head');
-  eq(run1('ExHold', 0.09, 0).PERFECT, 2, 'ExHold 90 ms late: head PERFECT, tail PERFECT');
-  eq(run1('ExHold', -0.065, 0).PERFECT, 2, 'ExHold 65 ms early: the same');
-
-  const endEarly = (type, ms) => { const jj = new T.Judge(chart([hold(type)])); jj.down('f', 7, 2); jj.up('f', 4 - ms / 1000); return jj.finish().counts; };
-  eq(endEarly('Hold', 50).PERFECT, 2, 'released 50 ms before the end: counts as held');
-  eq(endEarly('Hold', 100).PERFECT, 2, 'released 100 ms before the end: still held (150 ms tolerance)');
-  eq(endEarly('Hold', 200).MISS, 1, 'control: a plain Hold released 200 ms early: tail MISS');
-  eq(endEarly('ExHold', 250).PERFECT, 2, 'ExHold has double tolerance (300 ms): released 250 ms early still counts');
-  eq(endEarly('ExHold', 350).MISS, 1, 'but not beyond 300 ms');
-  eq(T.slotCount(hold('ExHold')), 2, 'ExHold is still two judgements');
+  eq(run1('ExHold', 0.09, 0).MISS, 0, 'ExHold 90 ms late: nothing missed');
+  eq(run1('ExHold', 0.09, 0).PERFECT, 8, 'head PERFECT and every checkpoint PERFECT');
+  eq(run1('ExHold', -0.095, 0).PERFECT, 8, 'ExHold 95 ms early: the same (Ex window is 100 ms both ways)');
+  eq(T.slotCount(hold('ExHold'), 120), 8, 'ExHold has the same checkpoints as a Hold');
   const sl = type => ({ id: 's', type, layer: 'upper', time: 2, end: 4, x: 0, width: 3, path: [{ t: 2, x: 0, width: 3 }, { t: 4, x: 18, width: 3 }] });
   const ev = chart([sl('ExSlide')]);
   const j = new T.Judge(ev);
   const events = T.autoplayEvents(ev).map(e => (e.k === 'down' ? { ...e, t: e.t + 0.09 } : e));
-  eq(T.play(j, events.sort((p, q) => p.t - q.t)).counts.PERFECT, 2, 'ExSlide: head touched 90 ms late is PERFECT');
+  eq(T.play(j, events.sort((p, q) => p.t - q.t)).counts.MISS, 0, 'ExSlide: head touched 90 ms late is PERFECT');
   const j2 = new T.Judge(chart([sl('Slide')]));
   const e2 = T.autoplayEvents(chart([sl('Slide')])).map(e => (e.k === 'down' ? { ...e, t: e.t + 0.09 } : e));
   eq(T.play(j2, e2.sort((p, q) => p.t - q.t)).counts.GOOD, 1, 'control: a plain Slide 90 ms late has a GOOD head');

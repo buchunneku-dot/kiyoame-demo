@@ -55,7 +55,7 @@ The game uses a **mouse or a touch screen**. There is no keyboard input.
 | **Slide** | Like a Hold, but the range moves. Follow it. |
 | **Drag** (yellow) | Just touch it. A finger resting or sweeping through the range counts, and every touch is PERFECT. |
 | **Flow** | A long band scored in ticks. Keep a finger inside it; on the scrub kind, rub back and forth across it. |
-| **Ex** notes (gold outline) | Ex Tap, Ex Hold, Ex Slide and Ex Flow work like the plain notes with a more forgiving timing window. |
+| **Ex** notes (gold outline) | Ex Tap, Ex Hold, Ex Slide and Ex Flow work like the plain notes, but any hit within 100 ms either way is PERFECT. |
 | **Linked pair** | Two notes at the same moment, one on each layer, joined by a yellow line. Hit both. |
 
 ### Judgement and score
@@ -67,7 +67,9 @@ The game uses a **mouse or a touch screen**. There is no keyboard input.
 | GOOD | 70–100 ms late |
 | MISS | more than 100 ms late, or not hit |
 
-There is no early GOOD or early MISS: a touch more than 70 ms before a note is ignored, and a finger already resting on a note before its window opens does not take it. When two notes' timing windows overlap, a touch goes to the note it would grade higher. A finger that lands up to one cell outside a note still hits it, unless it is resting on another note that is coming up. Holds can be let go up to 150 ms early (300 ms for Ex Hold).
+There is no early GOOD or early MISS: a touch more than 70 ms before a note is ignored, and a finger already resting on a note before its window opens does not take it. When two notes' timing windows overlap, a touch goes to the note it would grade higher. A finger that lands up to one cell outside a note still hits it, unless it is resting on another note that is coming up.
+
+Holds and Slides are judged at the start like a tap, then at a checkpoint every eighth note (every sixteenth under 120 BPM). Each checkpoint is PERFECT if a finger was inside within the last 50 ms, GREAT within 100 ms, GOOD within 150 ms, and MISS otherwise. There is no judgement on release, and missing the start does not end the note: keep holding and the checkpoints still count.
 
 The score goes up to 1,000,000. The result screen shows accuracy, max combo and the grade counts for each layer.
 
