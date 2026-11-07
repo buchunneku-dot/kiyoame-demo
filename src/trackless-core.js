@@ -294,7 +294,7 @@
         for (const n of this.notes) {
           if (n.head !== null || n.type === 'Drag') continue;
           if (n.time - n.early > tb + 1e-9) break;
-          if (n.time - n.early > c.cellAt + 1e-9) continue;
+          if (baseOf(n) === 'Tap' && n.time - n.early > c.cellAt + 1e-9) continue;
           const off = col < n.x ? n.x - col : col >= n.x + n.width ? col - n.x - n.width + 1 : 0;
           if (off > reach) continue;
           const a = Math.max(ta, n.time - n.early), b = Math.min(tb, n.time + n.late);

@@ -76,7 +76,21 @@ for (const [g, want] of [[C.checkpoint.perfect, 'PERFECT'], [C.checkpoint.perfec
 }
 {
   const r = play([hold('h', 1, 2, 0)], [['down', 'p', 1, 0.85], ['up', 'p', 2.01]]);
-  check('Hold checkpoints', 'pressed 150 ms early and held', 'head MISS, checks PERFECT', `head ${r.by['h.head']}, checks ${r.by['h.check0'] === 'PERFECT' && r.by['h.check2'] === 'PERFECT' ? 'PERFECT' : 'lost'}`);
+  check('Hold checkpoints', 'pressed 150 ms early and held', 'head GREAT, checks PERFECT', `head ${r.by['h.head']}, checks ${r.by['h.check0'] === 'PERFECT' && r.by['h.check2'] === 'PERFECT' ? 'PERFECT' : 'lost'}`);
+}
+for (const early of [0.08, 0.09, 0.1, 0.3, 1]) {
+  const r = play([hold('h', 2, 3, 0)], [['down', 'p', 1, 2 - early], ['up', 'p', 3.01]]);
+  check('Early press on long notes', `Hold pressed ${ms(early)} early and held`, 'head GREAT', `head ${r.by['h.head']}`);
+}
+{
+  const r = play([hold('h', 2, 3, 0, 3, 'ExHold')], [['down', 'p', 1, 1.8], ['up', 'p', 3.01]]);
+  check('Early press on long notes', 'ExHold pressed 200 ms early and held', 'head PERFECT', `head ${r.by['h.head']}`);
+  const w = play([hold('h', 2, 3, 0)], [['down', 'p', 1, 1.9], ['move', 'p', 1.2, 1.92], ['move', 'p', 0.8, 1.94], ['move', 'p', 1.1, 1.96], ['up', 'p', 3.01]]);
+  check('Early press on long notes', 'Hold pressed 100 ms early with finger wobble across a cell edge', 'head GREAT', `head ${w.by['h.head']}`);
+  const s = play([slide('s', 2, 3, 0, 6)], [['down', 'p', 1, 1.85], ['up', 'p', 2.02]]);
+  check('Early press on long notes', 'Slide pressed 150 ms early', 'head GREAT', `head ${s.by['s.head']}`);
+  const t = play([tap('a', 2, 0)], [['down', 'p', 1, 1.85], ['up', 'p', 2.3]]);
+  check('Early press on long notes', 'Tap: a finger resting since 150 ms early still does not take it', 'MISS', t.by['a.head']);
 }
 {
   const r = play([hold('h', 1, 2, 0)], []);

@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const T = window.KiyoameTrackless, Proj = window.KiyoameProjection;
+  const T = window.KiyoameTrackless, Proj = window.KiyoameProjection, CFG = T.CONFIG;
   const $ = id => document.getElementById(id);
   const canvas = $('c'), g = canvas.getContext('2d');
 
@@ -70,15 +70,28 @@
   let ctx = null, master = null, startAt = 0, judge = null, chart = null, events = null, evIdx = 0, running = false;
   const flashes = [], pops = [];
   let lastGrade = null, lastGradeAt = 0;
-  const outLatency = () => Math.max(0, Math.min(KiyoameJudgementConfig.input.maxOutputLatency, (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0));
+  const outLatency = () => Math.max(0, Math.min(CFG.input.maxOutputLatency, (ctx && (ctx.outputLatency || ctx.baseLatency)) || 0));
   const songTime = () => (ctx ? ctx.currentTime - outLatency() - startAt : 0);
-  const JUDGE_LAG = KiyoameJudgementConfig.input.judgeLag;
+  const JUDGE_LAG = CFG.input.judgeLag;
 
   const Song = window.KiyoameSong;
   const CHART_KEY = 'kiyoame.chart', SONG_KEY = 'kiyoame.song';
   let chartName = 'standard';
   try { if (Song.charts.includes(localStorage.getItem(CHART_KEY))) chartName = localStorage.getItem(CHART_KEY); } catch (e) {}
   try { if (Song.songs.includes(localStorage.getItem(SONG_KEY))) Song.select(localStorage.getItem(SONG_KEY)); } catch (e) {}
+  const editorTest = (() => {
+    if (new URLSearchParams(location.search).get('chart') !== 'editor') return null;
+    try {
+      const d = JSON.parse(localStorage.getItem('kiyoame.editorChart'));
+      if (!d || !Song.songs.includes(d.song)) return null;
+      const from = Math.max(0, Number(d.from) || 0), keep = d.chart.notes.filter(n => n.time >= from);
+      const ids = new Set(keep.map(n => n.id));
+      for (const n of keep) if (n.link !== undefined && !ids.has(n.link)) delete n.link;
+      T.validateChart(Object.assign({}, d.chart, { notes: keep }));
+      Song.select(d.song);
+      return { chart: Object.assign({}, d.chart, { notes: keep }), from };
+    } catch (e) { return null; }
+  })();
   const goButtons = () => [...document.querySelectorAll('.go'), $('again')];
   let starting = false, lastClock = 0, lastClockAt = 0;
   const canFullscreen = () => !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
@@ -112,7 +125,7 @@
       await ready;
       if (document.hidden || H > W) throw new Error('Keep the page in front and in landscape, then press Start.');
     if (Song.prepare) await Song.prepare(ctx);
-    chart = Song.buildChart(chartName);
+    chart = editorTest ? JSON.parse(JSON.stringify(editorTest.chart)) : Song.buildChart(chartName);
     const lint = T.lint(chart);
     if (lint.warnings.length) console.warn('chart lint', lint.warnings);
     judge = new T.Judge(chart);
@@ -126,9 +139,9 @@
     };
     if (!master) { master = ctx.createGain(); master.gain.value = 0.7; master.connect(ctx.destination); }
 
-    const from = Number(new URLSearchParams(location.search).get('from')) || 0;
+    const from = editorTest ? editorTest.from : Number(new URLSearchParams(location.search).get('from')) || 0;
     startAt = ctx.currentTime + 0.4 - from;
-    if (!from) Song.scheduleBacking(ctx, master, startAt);
+    Song.scheduleBacking(ctx, master, startAt);
     events = $('auto').checked ? T.autoplayEvents(chart) : null; evIdx = 0;
     flashes.length = 0; pops.length = 0; lastGrade = null;
     lastClock = ctx.currentTime; lastClockAt = performance.now();
@@ -163,7 +176,7 @@
 
   const down = new Map();
 
-  const EDGE = KiyoameJudgementConfig.input.edgePx, PALM = KiyoameJudgementConfig.input.palmPx;
+  const EDGE = CFG.input.edgePx, PALM = CFG.input.palmPx;
 
   const TOUCH_KEY = 'kiyoame.trackless.touch';
   let touchZone = 'half';
@@ -506,6 +519,12 @@
     for (const b of document.querySelectorAll('#chart-pick button')) b.addEventListener('click', () => pick(b.dataset.chart));
     pick(chartName);
     showSong();
+    if (editorTest) {
+      $('song-meta').textContent = `Editor chart · ${editorTest.chart.notes.length} notes from ${length(editorTest.from)}`;
+      document.getElementById('chart-pick').style.display = 'none';
+      document.querySelector('.songs').style.display = 'none';
+      document.querySelector('.select').style.gridTemplateColumns = '1fr';
+    }
   }
   for (const b of document.querySelectorAll('.go')) b.addEventListener('click', startRun);
   $('again').addEventListener('click', startRun);
