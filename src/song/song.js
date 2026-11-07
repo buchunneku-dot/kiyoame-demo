@@ -47,7 +47,9 @@
     const buffer = buffers.get(current.id);
     if (!buffer) return;
     const source = ctx.createBufferSource();
-    source.buffer = buffer; source.connect(out); source.start(t0);
+    source.buffer = buffer; source.connect(out);
+    const at = Math.max(t0, ctx.currentTime);
+    source.start(at, at - t0);
   }
 
   function hitSound(ctx, out, xCells, layer, when) {

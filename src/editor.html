@@ -1,0 +1,133 @@
+<meta name="theme-color" content="#e4e8f1">
+<title>Kiyoame Chart Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#e4e8f1; --ink:#2a2f52; --muted:#6a7196; --line:rgba(42,47,82,.14); --glass:rgba(255,255,255,.82);
+          --upper:#6fd3cd; --lower:#f293ba; --accent:#e8a53a; --miss:#d9536a; --play:#5a63a6; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:Montserrat,system-ui,sans-serif; font-size:13px; overflow:hidden; }
+  .app { display:grid; grid-template-rows:auto minmax(0,1fr); grid-template-columns:300px minmax(0,1fr); height:100%; }
+  header { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line); background:var(--glass); }
+  header h1 { font-size:13px; font-weight:600; letter-spacing:.3em; margin:0 10px 0 0; white-space:nowrap; }
+  header .grow { flex:1; }
+  aside { overflow:auto; border-right:1px solid var(--line); background:rgba(255,255,255,.5); padding:12px; display:grid; gap:16px; align-content:start; }
+  main { position:relative; min-width:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; touch-action:none; }
+  h2 { margin:0 0 8px; font-size:11px; font-weight:600; letter-spacing:.24em; color:var(--muted); }
+  button, select, input { font:inherit; color:var(--ink); }
+  button { padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--glass); cursor:pointer; white-space:nowrap; }
+  button:hover { border-color:rgba(42,47,82,.3); }
+  button.on { background:var(--ink); color:#f6f7fb; border-color:var(--ink); }
+  button.primary { background:var(--ink); color:#f6f7fb; }
+  select, input[type=number], input[type=text] { padding:5px 8px; border-radius:8px; border:1px solid var(--line); background:var(--glass); min-width:0; }
+  label { display:flex; align-items:center; gap:6px; color:var(--muted); white-space:nowrap; }
+  .tools { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
+  .tools button { padding:8px 4px; }
+  .tools kbd { color:var(--muted); font-size:10px; margin-left:4px; font-family:inherit; }
+  .tools button.on kbd { color:#c9cce0; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .props { display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 8px; align-items:center; }
+  .props span { color:var(--muted); }
+  .props input, .props select { width:100%; }
+  .muted { color:var(--muted); line-height:1.6; }
+  .summary { line-height:1.7; }
+  .summary b { font-weight:600; }
+  .issues { display:grid; gap:4px; max-height:40vh; overflow:auto; }
+  .issue { text-align:left; white-space:normal; line-height:1.45; padding:6px 8px; border-left:3px solid var(--accent); }
+  .issue.error { border-left-color:var(--miss); }
+  .ok { color:#2f8a6a; font-weight:600; }
+  .bad { color:var(--miss); font-weight:600; }
+  .keys { display:grid; grid-template-columns:auto 1fr; gap:3px 10px; color:var(--muted); line-height:1.5; }
+  .keys b { color:var(--ink); font-weight:500; }
+  #toast { position:absolute; left:50%; bottom:40px; transform:translateX(-50%); background:var(--ink); color:#f6f7fb; padding:8px 14px; border-radius:10px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  #toast.show { opacity:.92; }
+  @media (max-width:760px) { .app { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr) 40%; } aside { order:3; border-right:0; border-top:1px solid var(--line); } }
+</style>
+<div class="app">
+  <header>
+    <h1>KIYOAME EDITOR</h1>
+    <label>Song <select id="song"></select></label>
+    <label>Chart <select id="chart"><option value="standard">Standard</option><option value="showcase">Showcase</option><option value="blank">New blank</option></select></label>
+    <button id="load" type="button">Load</button>
+    <button id="import" type="button">Import…</button>
+    <input id="import-file" type="file" accept=".js,.json,application/json,text/javascript" hidden>
+    <button id="export-js" type="button">Export .js</button>
+    <button id="export-json" type="button">Copy JSON</button>
+    <span class="grow"></span>
+    <button id="play" type="button" class="primary">Play</button>
+    <label>Rate <select id="rate"><option value="1">1×</option><option value="0.75">0.75×</option><option value="0.5">0.5×</option></select></label>
+    <label><input type="checkbox" id="ticks" checked> Hit sounds</label>
+    <button id="test" type="button">Test in game</button>
+  </header>
+  <aside>
+    <section>
+      <h2>TOOL</h2>
+      <div class="tools" id="tools">
+        <button type="button" data-tool="select">Select<kbd>V</kbd></button>
+        <button type="button" data-tool="Tap">Tap<kbd>1</kbd></button>
+        <button type="button" data-tool="Hold">Hold<kbd>2</kbd></button>
+        <button type="button" data-tool="Slide">Slide<kbd>3</kbd></button>
+        <button type="button" data-tool="Flow">Flow<kbd>4</kbd></button>
+        <button type="button" data-tool="Drag">Drag<kbd>5</kbd></button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label><input type="checkbox" id="ex"> Ex <kbd class="muted">E</kbd></label>
+        <label>Width <input type="number" id="def-width" min="1" max="24" value="3" style="width:56px"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>Snap <select id="snap"><option value="4">1/4</option><option value="8">1/8</option><option value="12">1/12</option><option value="16" selected>1/16</option><option value="24">1/24</option><option value="32">1/32</option><option value="0">Off</option></select></label>
+        <label>Grid offset <input type="number" id="offset" step="1" value="0" style="width:64px"> ms</label>
+      </div>
+    </section>
+    <section>
+      <h2>SELECTION</h2>
+      <div id="props"></div>
+    </section>
+    <section>
+      <h2>CHART CHECK</h2>
+      <div class="summary" id="summary"></div>
+      <div class="issues" id="issues"></div>
+    </section>
+    <section>
+      <h2>CHART</h2>
+      <div class="props">
+        <span>ID</span><input type="text" id="meta-id">
+        <span>Title</span><input type="text" id="meta-title">
+        <span>BPM</span><input type="number" id="meta-bpm" min="20" max="400" step="0.01">
+        <span>Length</span><input type="number" id="meta-duration" min="1" step="0.1">
+      </div>
+    </section>
+    <section>
+      <h2>KEYS</h2>
+      <div class="keys">
+        <b>Click / drag</b><span>Place a note; drag sideways for width, up for length</span>
+        <b>Drag a note</b><span>Move it; drag its top edge to change the end</span>
+        <b>Right-click</b><span>Delete a note</span>
+        <b>Shift-click</b><span>Add to the selection</span>
+        <b>L / U</b><span>Link / unlink an upper and a lower note</span>
+        <b>Arrows</b><span>Nudge by one snap line or one cell</span>
+        <b>Ctrl C / V</b><span>Copy, paste at the playhead</span>
+        <b>Ctrl Z / Y</b><span>Undo, redo</span>
+        <b>Space</b><span>Play or pause from the playhead</span>
+        <b>Wheel</b><span>Scroll; Ctrl + wheel zooms</span>
+        <b>Ruler click</b><span>Move the playhead</span>
+      </div>
+    </section>
+  </aside>
+  <main>
+    <canvas id="view"></canvas>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+<script src="judgement-config.js"></script>
+<script src="trackless-core.js"></script>
+<script src="song/chart-standard.js"></script>
+<script src="song/chart-showcase.js"></script>
+<script src="song/chart-ams-standard.js"></script>
+<script src="song/chart-ams-showcase.js"></script>
+<script src="song/song.js"></script>
+<script src="editor/editor-model.js"></script>
+<script src="editor/editor-view.js"></script>
+<script src="editor/editor.js"></script>
