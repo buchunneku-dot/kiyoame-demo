@@ -28,7 +28,7 @@ The judge answers three questions for every touch:
 | PERFECT | ±40 ms | Tap, Hold, Slide and Flow heads |
 | GREAT | ±70 ms | Same |
 | GOOD | late 70–100 ms only | Same |
-| Early limit | 70 ms | A press more than 70 ms early is ignored: there is no early GOOD and no early MISS |
+| Early limit | 70 ms | A Tap press more than 70 ms early is ignored: there is no early GOOD and no early MISS. A long note pressed early and held is taken when its window opens |
 | Ex window | ±100 ms, always PERFECT | ExTap, ExHold, ExSlide, ExFlow heads |
 | Drag window | ±150 ms, always PERFECT | Drag |
 
@@ -41,8 +41,8 @@ Late beyond the window is a MISS, recorded when the window closes.
 | Type | Start | While active | End | Slots |
 |---|---|---|---|---|
 | Tap | Graded by the timing windows | — | — | 1 |
-| Hold | Graded like a Tap | Checkpoints (Section 5) inside the fixed range | No release judgement | 1 + checkpoints |
-| Slide | Graded like a Tap at the path start | Checkpoints inside the moving range | No release judgement | 1 + checkpoints |
+| Hold | Graded like a Tap; pressed early and held, GREAT when the window opens | Checkpoints (Section 5) inside the fixed range | No release judgement | 1 + checkpoints |
+| Slide | Graded like a Tap at the path start; pressed early and held, GREAT when the window opens | Checkpoints inside the moving range | No release judgement | 1 + checkpoints |
 | Flow, hold mode | Graded like a Tap | A tick passes if a finger was inside within ±40 ms of it | — | 1 + ticks |
 | Flow, scrub mode | Graded like a Tap | A tick passes if finger movement inside the range since the previous tick is at least half the width | — | 1 + ticks |
 | Drag | Any touch passing through within ±150 ms is PERFECT | — | — | 1 |
@@ -89,7 +89,8 @@ One touch takes at most one Tap, Hold or Slide head per cell it enters.
 ### When a finger may take a new note
 
 - On press, or when it enters a new cell, or a new screen row.
-- A finger resting in a cell before a note's window opens never takes that note. This stops a held finger from collecting notes that open under it.
+- A finger resting in a cell before a Tap's window opens never takes that Tap. This stops a held finger from collecting taps that open under it.
+- Long notes (Hold, Slide, Flow) are the exception: a finger pressed early and still resting takes the note when its window opens, graded GREAT at that moment (PERFECT for Ex notes). An early press on a long note never misses.
 
 ### Overlapping windows on the same spot
 
@@ -147,7 +148,7 @@ The chart check enforces what the judge cannot resolve fairly at play time:
 
 | Suite | Content |
 |---|---|
-| `judgement-rules.test.js` | 64 cases: every window edge, position margin, checkpoints, slide path interruption, Flow, every conflict rule, scoring |
+| `judgement-rules.test.js` | 73 cases: every window edge, position margin, checkpoints, early presses on long notes, slide path interruption, Flow, every conflict rule, scoring |
 | `trackless-core.test.js` | 167 checks on chart validation, the judge and the chart check |
 | `song.test.js` | Every chart passes validation and the chart check, and auto play scores 1,000,000 |
 
@@ -173,7 +174,6 @@ The simulator lifts fingers between notes and never slides. Sliding brushes and 
 
 ## 11. Known issues
 
-- **Wobble on early hold presses.** A hold press 80–100 ms early can get a GREAT or a MISS on the start, depending on whether small finger movement crosses a cell edge after the window opens. A possible fix is to require half a cell of movement past an edge before it counts as a new cell.
 - **Device data.** Feel numbers come from the simulator and scripted touches, not logged play on real phones.
 - **Latency.** Compensation trusts the browser's reported output latency until a calibration screen exists.
 - **One window set.** All charts share one set of windows. Easier charts may need wider ones.

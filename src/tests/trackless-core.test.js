@@ -123,7 +123,7 @@ const parts = j => Object.fromEntries(j.results.map(r => [r.noteId + '.' + r.par
   eq(pl['h.check3'] + pl['h.check4'] + pl['h.check6'], 'MISSPERFECTPERFECT', 'but the checkpoints after joining count: a missed head does not kill the body');
   const early = new T.Judge(chart([hold])); early.down('p', 7, 1.85); early.up('p', 4.01); early.finish();
   const pe = parts(early);
-  eq(pe['h.head'], 'MISS', 'pressed 150 ms early and held: head MISS (taps keep their early rule)');
+  eq(pe['h.head'], 'GREAT', 'pressed 150 ms early and held: an early press never misses a long note, the head is GREAT when the window opens');
   eq(Object.values(pe).filter(g => g === 'PERFECT').length, 7, 'every checkpoint is PERFECT');
 }
 
