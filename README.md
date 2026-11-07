@@ -6,7 +6,7 @@
 
 The game is built in Unity 6 (URP) with a cel-shaded look. This repository holds the **demo video** and a **playable web prototype** of the rhythm mode.
 
-**[Play the web prototype in your browser](https://buchunneku-dot.github.io/kiyoame-demo/)** · **[Open the chart editor](https://buchunneku-dot.github.io/kiyoame-demo/editor.html)** · **[Watch the demo video](https://github.com/buchunneku-dot/kiyoame-demo/releases/latest)**
+**[Play the web prototype in your browser](https://buchunneku-dot.github.io/kiyoame-demo/)** · **[Open the chart editor](https://buchunneku-dot.github.io/kiyoame-demo/play/editor.html)** · **[Watch the demo video](https://github.com/buchunneku-dot/kiyoame-demo/releases/latest)**
 
 ## Demo video
 

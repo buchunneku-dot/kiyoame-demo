@@ -1,6 +1,6 @@
 # Chart Editor
 
-The chart editor ([`play/editor.html`](../play/editor.html), online at `/editor.html` next to the game) builds and checks two-layer charts in the same format the game plays. It runs in a desktop browser with a mouse and keyboard.
+The chart editor ([`play/editor.html`](../play/editor.html), [online](https://buchunneku-dot.github.io/kiyoame-demo/play/editor.html)) builds and checks two-layer charts in the same format the game plays. It runs in a desktop browser with a mouse and keyboard.
 
 ![Chart editor](../media/chart-editor.jpg)
 
