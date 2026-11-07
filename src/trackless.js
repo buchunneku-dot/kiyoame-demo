@@ -296,7 +296,8 @@
       if ((base === 'Tap' || n.type === 'Drag') && n.head !== null && !missed) continue;
 
       const fade = n.layer === 'lower' ? Math.max(0, Math.min(1, (D_MAX.lower - dOf(n.time)) / 1.2)) : 1;
-      const alpha = (missed ? 0.25 : 1) * fade;
+      const longHeld = (base === 'Hold' || base === 'Slide') && now >= n.time && holding(n);
+      const alpha = (missed && !longHeld ? 0.25 : 1) * fade;
       const skin = window.KiyoameTracklessNotes;
       if (n.type === 'Drag') {
         skin.drag(g, L, n.x, n.width, dOf(n.time), alpha);
