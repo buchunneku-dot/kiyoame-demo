@@ -21,20 +21,22 @@ The 54-second demo is attached to the [latest release](https://github.com/buchun
 
 ![Rhythm play](media/rhythm-1.jpg)
 
-The rhythm mode as a single web page, with one song: **Kiyoame Theme** (120 BPM, about 1:30).
+The rhythm mode as a single web page, with two songs: **Kiyoame Theme** (120 BPM, about 1:30) and **Ams** (136 BPM, about 2:30).
 
 ### Start playing
 
 - Play online at **https://buchunneku-dot.github.io/kiyoame-demo/**.
-- Or download this repository and open [`play/index.html`](play/index.html) in a desktop or mobile browser. It is one self-contained file with the music built in, so no server or install is needed.
+- Or download this repository and open [`play/index.html`](play/index.html) in a desktop or mobile browser. Kiyoame Theme is built into the page, so it plays with no server or install. Ams loads from `play/song/ams.mp3`, so play it online or through a local web server.
 - Chrome, Edge, Firefox and Safari all work. Play in landscape, and use headphones if you can. Start switches the page to fullscreen; leaving fullscreen pauses the song.
 
-On the home screen, pick a chart and press **Start**:
+On the song select screen, pick a song and a chart, then press **Start**:
 
-| Chart | Notes | For |
-|---|---|---|
-| **Standard** | 247 | A first play: the melody plus light decoration. |
-| **Showcase** | 351 | The full arrangement: chords, short stairs, hand-to-hand runs and sixteenths in the choruses. |
+| Song | Chart | Notes | For |
+|---|---|---|---|
+| Kiyoame Theme | **Standard** | 247 | A first play: the melody plus light decoration. |
+| Kiyoame Theme | **Showcase** | 351 | The full arrangement: chords, short stairs, hand-to-hand runs and sixteenths in the choruses. |
+| Ams | **Standard** | 454 | Kicks and snares in eighths, holds in the quiet parts, slides before the last drop. |
+| Ams | **Showcase** | 620 | Denser drops with sixteenth pairs and hand-to-hand runs into each drop. |
 
 ### Controls
 
@@ -42,7 +44,7 @@ The game uses a **mouse or a touch screen**. There is no keyboard input.
 
 - The field is one wide strip with no lanes, split into **24 cells** across. A note covers a range of cells, and you hit it by touching anywhere inside that range when it reaches the **judgement line** at the bottom.
 - Notes fall on **two layers**: the lower layer (pink) usually carries the melody, and the upper layer (teal) carries the arrangement around it. Both layers meet at the same line, so you play them with the same hand movements.
-- With a mouse you have one "finger". With a touch screen you can use as many fingers as you like. Neither chart ever needs more than two at once.
+- With a mouse you have one "finger". With a touch screen you can use as many fingers as you like. No chart ever needs more than two at once.
 
 ### Notes
 
@@ -103,7 +105,7 @@ node src/tests/trackless-audio.test.js
 
 ## Music
 
-Kiyoame Theme is an original soundtrack for this game.
+Kiyoame Theme and Ams are original music for this game.
 
 ## License
 

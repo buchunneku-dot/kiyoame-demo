@@ -1,10 +1,28 @@
 (function (root) {
   'use strict';
-  let buffer = null, loading = null;
 
-  const CHARTS = { standard: 'KiyoameChartStandard', showcase: 'KiyoameChartShowcase' };
+  const SONGS = [
+    { id: 'theme', title: 'Kiyoame Theme', embedded: 'KIYOAME_THEME_AUDIO', file: 'song/kiyoame-theme.mp3',
+      charts: { standard: 'KiyoameChartStandard', showcase: 'KiyoameChartShowcase' } },
+    { id: 'ams', title: 'Ams', file: 'song/ams.mp3',
+      charts: { standard: 'KiyoameChartAmsStandard', showcase: 'KiyoameChartAmsShowcase' } },
+  ];
+  const buffers = new Map(), loading = new Map();
+  let current = SONGS[0];
 
-  function buildChart(name) { return JSON.parse(JSON.stringify(root[CHARTS[name] || CHARTS.standard])); }
+  function select(id) { current = SONGS.find(s => s.id === id) || SONGS[0]; return current.id; }
+  function chartOf(song, name) { return root[song.charts[name] || song.charts.standard]; }
+  function buildChart(name, songId) {
+    const song = songId ? SONGS.find(s => s.id === songId) || current : current;
+    return JSON.parse(JSON.stringify(chartOf(song, name)));
+  }
+  function info(id) {
+    const song = SONGS.find(s => s.id === id);
+    const base = chartOf(song, 'standard');
+    const counts = {};
+    for (const name of Object.keys(song.charts)) counts[name] = chartOf(song, name).notes.length;
+    return { id: song.id, title: song.title, bpm: base.bpm, duration: base.duration, counts };
+  }
 
   function bytesOf(base64) {
     const text = atob(base64), out = new Uint8Array(text.length);
@@ -13,18 +31,20 @@
   }
 
   function prepare(ctx) {
-    if (buffer) return Promise.resolve(buffer);
-    if (!loading) {
-      const bytes = root.KIYOAME_THEME_AUDIO ? Promise.resolve(bytesOf(root.KIYOAME_THEME_AUDIO))
-        : fetch('song/kiyoame-theme.mp3').then(r => { if (!r.ok) throw new Error(); return r.arrayBuffer(); });
-      loading = bytes.catch(() => { throw new Error('Song audio not found.'); })
-        .then(data => new Promise((resolve, reject) => ctx.decodeAudioData(data, resolve, reject)))
-        .then(b => (buffer = b), e => { loading = null; throw e; });
+    const song = current;
+    if (buffers.has(song.id)) return Promise.resolve(buffers.get(song.id));
+    if (!loading.has(song.id)) {
+      const data = song.embedded && root[song.embedded] ? Promise.resolve(bytesOf(root[song.embedded]))
+        : fetch(song.file).then(r => { if (!r.ok) throw new Error(); return r.arrayBuffer(); });
+      loading.set(song.id, data.catch(() => { throw new Error('Song audio not found.'); })
+        .then(d => new Promise((resolve, reject) => ctx.decodeAudioData(d, resolve, reject)))
+        .then(b => { buffers.set(song.id, b); loading.delete(song.id); return b; }, e => { loading.delete(song.id); throw e; }));
     }
-    return loading;
+    return loading.get(song.id);
   }
 
   function scheduleBacking(ctx, out, t0) {
+    const buffer = buffers.get(current.id);
     if (!buffer) return;
     const source = ctx.createBufferSource();
     source.buffer = buffer; source.connect(out); source.start(t0);
@@ -41,5 +61,9 @@
     o.connect(g); g.connect(out); o.start(when); o.stop(when + 0.09);
   }
 
-  root.KiyoameSong = { charts: Object.keys(CHARTS), buildChart, prepare, scheduleBacking, hitSound, LEAD: 0 };
+  root.KiyoameSong = {
+    songs: SONGS.map(s => s.id), charts: ['standard', 'showcase'],
+    get selected() { return current.id; },
+    select, info, buildChart, prepare, scheduleBacking, hitSound, LEAD: 0,
+  };
 })(typeof window === 'object' ? window : globalThis);
